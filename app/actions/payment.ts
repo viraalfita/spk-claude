@@ -1,8 +1,8 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
 import { UpdatePaymentFormData } from "@/lib/types";
+import { revalidatePath } from "next/cache";
 
 export async function updatePaymentStatus(data: UpdatePaymentFormData) {
   try {

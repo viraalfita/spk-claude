@@ -1,9 +1,15 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import { STATUS_COLORS, PAYMENT_TERM_LABELS } from "@/lib/types";
-import { FileText, Download } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { PAYMENT_TERM_LABELS, STATUS_COLORS } from "@/lib/types";
+import { formatCurrency } from "@/lib/utils";
+import { Download, FileText } from "lucide-react";
 
 // Mock data for demo - In production, this would fetch based on vendor auth token
 async function getVendorSPKs() {
@@ -29,7 +35,9 @@ export default async function VendorDashboardPage() {
         <Card className="mb-6 bg-blue-50 border-blue-200">
           <CardContent className="pt-6">
             <p className="text-sm text-blue-800">
-              <strong>Note:</strong> This is a demo vendor dashboard. In production, vendors would access this page via a unique authentication link sent to their email.
+              <strong>Note:</strong> This is a demo vendor dashboard. In
+              production, vendors would access this page via a unique
+              authentication link sent to their email.
             </p>
           </CardContent>
         </Card>
@@ -60,12 +68,20 @@ export default async function VendorDashboardPage() {
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div>
-                          <CardTitle className="text-xl">{spk.spk_number}</CardTitle>
+                          <CardTitle className="text-xl">
+                            {spk.spk_number}
+                          </CardTitle>
                           <CardDescription className="mt-1">
                             {spk.project_name}
                           </CardDescription>
                         </div>
-                        <Badge className={STATUS_COLORS[spk.status as keyof typeof STATUS_COLORS]}>
+                        <Badge
+                          className={
+                            STATUS_COLORS[
+                              spk.status as keyof typeof STATUS_COLORS
+                            ]
+                          }
+                        >
                           {spk.status}
                         </Badge>
                       </div>
@@ -79,7 +95,9 @@ export default async function VendorDashboardPage() {
                       </div>
 
                       <div className="mb-4">
-                        <p className="text-sm text-gray-500 mb-2">Payment Status</p>
+                        <p className="text-sm text-gray-500 mb-2">
+                          Payment Status
+                        </p>
                         <div className="space-y-2">
                           {spk.payments?.map((payment: any) => (
                             <div
@@ -88,13 +106,24 @@ export default async function VendorDashboardPage() {
                             >
                               <div>
                                 <p className="font-medium text-sm">
-                                  {PAYMENT_TERM_LABELS[payment.term as keyof typeof PAYMENT_TERM_LABELS]}
+                                  {
+                                    PAYMENT_TERM_LABELS[
+                                      payment.term as keyof typeof PAYMENT_TERM_LABELS
+                                    ]
+                                  }
                                 </p>
                                 <p className="text-xs text-gray-500">
-                                  {payment.percentage}% - {formatCurrency(payment.amount, spk.currency)}
+                                  {payment.percentage}% -{" "}
+                                  {formatCurrency(payment.amount, spk.currency)}
                                 </p>
                               </div>
-                              <Badge className={STATUS_COLORS[payment.status as keyof typeof STATUS_COLORS]}>
+                              <Badge
+                                className={
+                                  STATUS_COLORS[
+                                    payment.status as keyof typeof STATUS_COLORS
+                                  ]
+                                }
+                              >
                                 {payment.status}
                               </Badge>
                             </div>
@@ -126,9 +155,7 @@ export default async function VendorDashboardPage() {
                   Office Renovation Phase 1
                 </CardDescription>
               </div>
-              <Badge className={STATUS_COLORS.published}>
-                published
-              </Badge>
+              <Badge className={STATUS_COLORS.published}>published</Badge>
             </div>
           </CardHeader>
           <CardContent>

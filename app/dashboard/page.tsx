@@ -1,11 +1,11 @@
-import Link from "next/link";
 import { getSPKList } from "@/app/actions/spk";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { STATUS_COLORS } from "@/lib/types";
-import { Plus, FileText } from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/utils";
+import { FileText, Plus } from "lucide-react";
+import Link from "next/link";
 
 export default async function DashboardPage() {
   const result = await getSPKList();
@@ -17,7 +17,9 @@ export default async function DashboardPage() {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Admin Dashboard
+            </h1>
             <p className="mt-2 text-gray-600">
               Manage SPKs and track payment status
             </p>
@@ -128,7 +130,13 @@ export default async function DashboardPage() {
                           {formatCurrency(spk.contract_value, spk.currency)}
                         </td>
                         <td className="py-4">
-                          <Badge className={STATUS_COLORS[spk.status as keyof typeof STATUS_COLORS]}>
+                          <Badge
+                            className={
+                              STATUS_COLORS[
+                                spk.status as keyof typeof STATUS_COLORS
+                              ]
+                            }
+                          >
                             {spk.status}
                           </Badge>
                         </td>
