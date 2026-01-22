@@ -102,8 +102,12 @@ export async function publishSPK(spkId: string) {
 
     // Trigger n8n webhook for SPK published
     if (process.env.N8N_WEBHOOK_SPK_PUBLISHED) {
-      const baseUrl =
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+      if (!baseUrl) {
+        throw new Error(
+          "NEXT_PUBLIC_APP_URL is not set in environment variables",
+        );
+      }
       const pdfUrl = `${baseUrl}/api/pdf/${spkId}`;
       const vendorLink = `${baseUrl}/vendor?spkId=${spkId}`;
 
