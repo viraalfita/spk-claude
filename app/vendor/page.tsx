@@ -65,7 +65,7 @@ export default async function VendorDashboardPage() {
                             {spk.project_name}
                           </CardDescription>
                         </div>
-                        <Badge className={STATUS_COLORS[spk.status]}>
+                        <Badge className={STATUS_COLORS[spk.status as keyof typeof STATUS_COLORS]}>
                           {spk.status}
                         </Badge>
                       </div>
@@ -88,13 +88,13 @@ export default async function VendorDashboardPage() {
                             >
                               <div>
                                 <p className="font-medium text-sm">
-                                  {PAYMENT_TERM_LABELS[payment.term]}
+                                  {PAYMENT_TERM_LABELS[payment.term as keyof typeof PAYMENT_TERM_LABELS]}
                                 </p>
                                 <p className="text-xs text-gray-500">
                                   {payment.percentage}% - {formatCurrency(payment.amount, spk.currency)}
                                 </p>
                               </div>
-                              <Badge className={STATUS_COLORS[payment.status]}>
+                              <Badge className={STATUS_COLORS[payment.status as keyof typeof STATUS_COLORS]}>
                                 {payment.status}
                               </Badge>
                             </div>

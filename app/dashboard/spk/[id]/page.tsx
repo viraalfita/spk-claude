@@ -1,13 +1,19 @@
 import { getSPKWithPayments } from "@/app/actions/spk";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { PaymentStatusUpdate } from "@/components/payment-status-update";
+import { PublishSPKButton } from "@/components/publish-spk-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { PAYMENT_TERM_LABELS, Payment, STATUS_COLORS } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { STATUS_COLORS, PAYMENT_TERM_LABELS } from "@/lib/types";
-import { ArrowLeft, Download, Send } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import Link from "next/link";
-import { PublishSPKButton } from "@/components/publish-spk-button";
-import { PaymentStatusUpdate } from "@/components/payment-status-update";
 
 export default async function SPKDetailPage({
   params,
@@ -21,7 +27,9 @@ export default async function SPKDetailPage({
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="max-w-md">
           <CardContent className="pt-6">
-            <p className="text-center text-red-600">Failed to load SPK details</p>
+            <p className="text-center text-red-600">
+              Failed to load SPK details
+            </p>
             <Link href="/dashboard">
               <Button className="mt-4 w-full">Back to Dashboard</Button>
             </Link>
@@ -54,16 +62,18 @@ export default async function SPKDetailPage({
                   Created on {formatDate(spk.created_at)} by {spk.created_by}
                 </CardDescription>
               </div>
-              <Badge className={STATUS_COLORS[spk.status]}>
+              <Badge
+                className={
+                  STATUS_COLORS[spk.status as keyof typeof STATUS_COLORS]
+                }
+              >
                 {spk.status}
               </Badge>
             </div>
           </CardHeader>
           <CardContent>
             <div className="flex gap-4">
-              {spk.status === "draft" && (
-                <PublishSPKButton spkId={spk.id} />
-              )}
+              {spk.status === "draft" && <PublishSPKButton spkId={spk.id} />}
               <Link href={`/api/pdf/${spk.id}`} target="_blank">
                 <Button variant="outline">
                   <Download className="mr-2 h-4 w-4" />
@@ -158,7 +168,7 @@ export default async function SPKDetailPage({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {spk.payments.map((payment) => (
+              {spk.payments.map((payment: Payment) => (
                 <div
                   key={payment.id}
                   className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"

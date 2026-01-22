@@ -128,7 +128,7 @@ export default async function DashboardPage() {
                           {formatCurrency(spk.contract_value, spk.currency)}
                         </td>
                         <td className="py-4">
-                          <Badge className={STATUS_COLORS[spk.status]}>
+                          <Badge className={STATUS_COLORS[spk.status as keyof typeof STATUS_COLORS]}>
                             {spk.status}
                           </Badge>
                         </td>

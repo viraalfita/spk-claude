@@ -47,11 +47,26 @@ export interface Database {
           updated_at: string;
           updated_by: string;
         };
-        Insert: Omit<
-          Database["public"]["Tables"]["payment"]["Row"],
-          "id" | "updated_at"
-        >;
-        Update: Partial<Database["public"]["Tables"]["payment"]["Insert"]>;
+        Insert: {
+          spk_id: string;
+          term: "dp" | "progress" | "final";
+          amount: number;
+          percentage: number;
+          status: "pending" | "paid" | "overdue";
+          paid_date?: string | null;
+          payment_reference?: string | null;
+          updated_by: string;
+        };
+        Update: {
+          spk_id?: string;
+          term?: "dp" | "progress" | "final";
+          amount?: number;
+          percentage?: number;
+          status?: "pending" | "paid" | "overdue";
+          paid_date?: string | null;
+          payment_reference?: string | null;
+          updated_by?: string;
+        };
       };
       vendor: {
         Row: {

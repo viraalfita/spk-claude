@@ -6,18 +6,12 @@ import { UpdatePaymentFormData } from "@/lib/types";
 
 export async function updatePaymentStatus(data: UpdatePaymentFormData) {
   try {
-    const updateData: any = {
+    const updateData = {
       status: data.status,
       updated_by: "admin@company.com", // TODO: Get from auth session
+      paid_date: data.paidDate || undefined,
+      payment_reference: data.paymentReference || undefined,
     };
-
-    if (data.paidDate) {
-      updateData.paid_date = data.paidDate;
-    }
-
-    if (data.paymentReference) {
-      updateData.payment_reference = data.paymentReference;
-    }
 
     const { data: payment, error } = await supabaseAdmin
       .from("payment")

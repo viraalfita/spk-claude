@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { createSPK } from "@/app/actions/spk";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { createSPK } from "@/app/actions/spk";
 import { CreateSPKFormData } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export function SPKCreateForm() {
   const router = useRouter();
@@ -24,11 +24,12 @@ export function SPKCreateForm() {
     endDate: "",
     dpPercentage: 30,
     progressPercentage: 40,
+    finalPercentage: 30,
     notes: "",
   });
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -48,7 +49,8 @@ export function SPKCreateForm() {
 
     try {
       // Validate percentages sum to 100
-      const totalPercentage = formData.dpPercentage + formData.progressPercentage;
+      const totalPercentage =
+        formData.dpPercentage + formData.progressPercentage;
       if (totalPercentage > 100) {
         alert("Payment percentages cannot exceed 100%");
         setLoading(false);
@@ -71,9 +73,11 @@ export function SPKCreateForm() {
     }
   };
 
-  const finalPercentage = 100 - formData.dpPercentage - formData.progressPercentage;
+  const finalPercentage =
+    100 - formData.dpPercentage - formData.progressPercentage;
   const dpAmount = (formData.contractValue * formData.dpPercentage) / 100;
-  const progressAmount = (formData.contractValue * formData.progressPercentage) / 100;
+  const progressAmount =
+    (formData.contractValue * formData.progressPercentage) / 100;
   const finalAmount = (formData.contractValue * finalPercentage) / 100;
 
   return (
@@ -223,7 +227,7 @@ export function SPKCreateForm() {
               max="100"
             />
             <p className="mt-1 text-sm text-gray-500">
-              Amount: Rp {dpAmount.toLocaleString('id-ID')}
+              Amount: Rp {dpAmount.toLocaleString("id-ID")}
             </p>
           </div>
 
@@ -239,7 +243,7 @@ export function SPKCreateForm() {
               max="100"
             />
             <p className="mt-1 text-sm text-gray-500">
-              Amount: Rp {progressAmount.toLocaleString('id-ID')}
+              Amount: Rp {progressAmount.toLocaleString("id-ID")}
             </p>
           </div>
         </div>
@@ -252,7 +256,7 @@ export function SPKCreateForm() {
             className="bg-gray-50"
           />
           <p className="mt-1 text-sm text-gray-500">
-            Amount: Rp {finalAmount.toLocaleString('id-ID')}
+            Amount: Rp {finalAmount.toLocaleString("id-ID")}
           </p>
         </div>
 
