@@ -7,18 +7,45 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { supabaseAdmin } from "@/lib/supabase/server";
 import { PAYMENT_TERM_LABELS, STATUS_COLORS } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { Download, FileText } from "lucide-react";
+import Link from "next/link";
 
-// Mock data for demo - In production, this would fetch based on vendor auth token
-async function getVendorSPKs() {
-  // Simulate fetching vendor's SPKs
-  return [];
+async function getVendorSPK(spkId: string) {
+  try {
+    const { data: spk, error } = await supabaseAdmin
+      .from("spk")
+      .select(
+        `
+        *,
+        payments:payment(*)
+      `,
+      )
+      .eq("id", spkId)
+      .eq("status", "published")
+      .single();
+
+    if (error) {
+      console.error("Error fetching SPK:", error);
+      return null;
+    }
+
+    return spk;
+  } catch (error) {
+    console.error("Error:", error);
+    return null;
+  }
 }
 
-export default async function VendorDashboardPage() {
-  const spks = await getVendorSPKs();
+export default async function VendorDashboardPage({
+  searchParams,
+}: {
+  searchParams: { spkId?: string };
+}) {
+  const spkId = searchParams.spkId;
+  const spk = spkId ? await getVendorSPK(spkId) : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
@@ -31,180 +58,178 @@ export default async function VendorDashboardPage() {
           </p>
         </div>
 
-        {/* Info Card */}
-        <Card className="mb-6 bg-blue-50 border-blue-200">
-          <CardContent className="pt-6">
-            <p className="text-sm text-blue-800">
-              <strong>Note:</strong> This is a demo vendor dashboard. In
-              production, vendors would access this page via a unique
-              authentication link sent to their email.
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* SPK List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Work Orders (SPK)</CardTitle>
-            <CardDescription>
-              View all SPKs assigned to you and their payment status
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!spks || spks.length === 0 ? (
-              <div className="py-12 text-center">
-                <FileText className="mx-auto h-12 w-12 text-gray-400" />
+        {/* SPK Details */}
+        {!spkId ? (
+          <Card className="mb-6 bg-yellow-50 border-yellow-200">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <FileText className="mx-auto h-12 w-12 text-yellow-600" />
                 <h3 className="mt-4 text-lg font-medium text-gray-900">
-                  No SPKs assigned yet
+                  No SPK Selected
                 </h3>
-                <p className="mt-2 text-gray-500">
-                  You will see your work orders here once they are published
+                <p className="mt-2 text-sm text-yellow-800">
+                  Please access this page via the link provided in your email.
                 </p>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {spks.map((spk: any) => (
-                  <Card key={spk.id} className="border-2">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-xl">
-                            {spk.spk_number}
-                          </CardTitle>
-                          <CardDescription className="mt-1">
-                            {spk.project_name}
-                          </CardDescription>
-                        </div>
-                        <Badge
-                          className={
-                            STATUS_COLORS[
-                              spk.status as keyof typeof STATUS_COLORS
-                            ]
-                          }
+            </CardContent>
+          </Card>
+        ) : !spk ? (
+          <Card className="mb-6 bg-red-50 border-red-200">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <FileText className="mx-auto h-12 w-12 text-red-600" />
+                <h3 className="mt-4 text-lg font-medium text-gray-900">
+                  SPK Not Found
+                </h3>
+                <p className="mt-2 text-sm text-red-800">
+                  The SPK you are looking for does not exist or has not been
+                  published yet.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Vendor Info */}
+            <Card className="mb-6 bg-blue-50 border-blue-200">
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Vendor</p>
+                    <p className="font-medium text-gray-900">
+                      {spk.vendor_name}
+                    </p>
+                  </div>
+                  {spk.vendor_email && (
+                    <div>
+                      <p className="text-sm text-gray-600">Email</p>
+                      <p className="font-medium text-gray-900">
+                        {spk.vendor_email}
+                      </p>
+                    </div>
+                  )}
+                  {spk.vendor_phone && (
+                    <div>
+                      <p className="text-sm text-gray-600">Phone</p>
+                      <p className="font-medium text-gray-900">
+                        {spk.vendor_phone}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* SPK Card */}
+            <Card className="border-2">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle className="text-xl">{spk.spk_number}</CardTitle>
+                    <CardDescription className="mt-1">
+                      {spk.project_name}
+                    </CardDescription>
+                  </div>
+                  <Badge
+                    className={
+                      STATUS_COLORS[spk.status as keyof typeof STATUS_COLORS]
+                    }
+                  >
+                    {spk.status}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {spk.project_description && (
+                  <div className="mb-4 p-4 bg-gray-50 rounded">
+                    <p className="text-sm text-gray-600 mb-1">
+                      Project Description
+                    </p>
+                    <p className="text-sm text-gray-900">
+                      {spk.project_description}
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Contract Value</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {formatCurrency(spk.contract_value, spk.currency)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Project Period</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {new Date(spk.start_date).toLocaleDateString()} -{" "}
+                      {spk.end_date
+                        ? new Date(spk.end_date).toLocaleDateString()
+                        : "Ongoing"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <p className="text-sm text-gray-500 mb-2">Payment Status</p>
+                  <div className="space-y-2">
+                    {spk.payments
+                      ?.sort((a: any, b: any) => {
+                        const order = { dp: 0, progress: 1, final: 2 };
+                        return (
+                          order[a.term as keyof typeof order] -
+                          order[b.term as keyof typeof order]
+                        );
+                      })
+                      .map((payment: any) => (
+                        <div
+                          key={payment.id}
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded"
                         >
-                          {spk.status}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="mb-4">
-                        <p className="text-sm text-gray-500">Contract Value</p>
-                        <p className="text-2xl font-bold text-blue-600">
-                          {formatCurrency(spk.contract_value, spk.currency)}
-                        </p>
-                      </div>
-
-                      <div className="mb-4">
-                        <p className="text-sm text-gray-500 mb-2">
-                          Payment Status
-                        </p>
-                        <div className="space-y-2">
-                          {spk.payments?.map((payment: any) => (
-                            <div
-                              key={payment.id}
-                              className="flex items-center justify-between p-3 bg-gray-50 rounded"
-                            >
-                              <div>
-                                <p className="font-medium text-sm">
-                                  {
-                                    PAYMENT_TERM_LABELS[
-                                      payment.term as keyof typeof PAYMENT_TERM_LABELS
-                                    ]
-                                  }
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {payment.percentage}% -{" "}
-                                  {formatCurrency(payment.amount, spk.currency)}
-                                </p>
-                              </div>
-                              <Badge
-                                className={
-                                  STATUS_COLORS[
-                                    payment.status as keyof typeof STATUS_COLORS
-                                  ]
-                                }
-                              >
-                                {payment.status}
-                              </Badge>
-                            </div>
-                          ))}
+                          <div>
+                            <p className="font-medium text-sm">
+                              {
+                                PAYMENT_TERM_LABELS[
+                                  payment.term as keyof typeof PAYMENT_TERM_LABELS
+                                ]
+                              }
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {payment.percentage}% -{" "}
+                              {formatCurrency(payment.amount, spk.currency)}
+                            </p>
+                            {payment.paid_date && (
+                              <p className="text-xs text-green-600 mt-1">
+                                Paid on{" "}
+                                {new Date(
+                                  payment.paid_date,
+                                ).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                          <Badge
+                            className={
+                              STATUS_COLORS[
+                                payment.status as keyof typeof STATUS_COLORS
+                              ]
+                            }
+                          >
+                            {payment.status}
+                          </Badge>
                         </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="flex-1">
-                          <Download className="mr-2 h-4 w-4" />
-                          Download PDF
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Sample SPK for Demo */}
-        <Card className="mt-6 border-2 border-dashed">
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle className="text-xl">SPK-2026-001 (Sample)</CardTitle>
-                <CardDescription className="mt-1">
-                  Office Renovation Phase 1
-                </CardDescription>
-              </div>
-              <Badge className={STATUS_COLORS.published}>published</Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4">
-              <p className="text-sm text-gray-500">Contract Value</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {formatCurrency(100000000, "IDR")}
-              </p>
-            </div>
-
-            <div className="mb-4">
-              <p className="text-sm text-gray-500 mb-2">Payment Status</p>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                  <div>
-                    <p className="font-medium text-sm">Down Payment</p>
-                    <p className="text-xs text-gray-500">
-                      30% - {formatCurrency(30000000, "IDR")}
-                    </p>
+                      ))}
                   </div>
-                  <Badge className={STATUS_COLORS.paid}>paid</Badge>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                  <div>
-                    <p className="font-medium text-sm">Progress Payment</p>
-                    <p className="text-xs text-gray-500">
-                      40% - {formatCurrency(40000000, "IDR")}
-                    </p>
-                  </div>
-                  <Badge className={STATUS_COLORS.pending}>pending</Badge>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                  <div>
-                    <p className="font-medium text-sm">Final Payment</p>
-                    <p className="text-xs text-gray-500">
-                      30% - {formatCurrency(30000000, "IDR")}
-                    </p>
-                  </div>
-                  <Badge className={STATUS_COLORS.pending}>pending</Badge>
-                </div>
-              </div>
-            </div>
 
-            <Button size="sm" variant="outline" className="w-full">
-              <Download className="mr-2 h-4 w-4" />
-              Download PDF
-            </Button>
-          </CardContent>
-        </Card>
+                <Link href={`/api/pdf/${spk.id}`} target="_blank">
+                  <Button size="sm" variant="outline" className="w-full">
+                    <Download className="mr-2 h-4 w-4" />
+                    Download PDF
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
     </div>
   );

@@ -1,16 +1,19 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
-import { generateSPKNumber } from "@/lib/utils";
 import { CreateSPKFormData } from "@/lib/types";
+import { generateSPKNumber } from "@/lib/utils";
+import { revalidatePath } from "next/cache";
 
 export async function createSPK(data: CreateSPKFormData) {
   try {
     // Calculate payment amounts based on percentages
     const dpAmount = (data.contractValue * data.dpPercentage) / 100;
     const progressAmount = (data.contractValue * data.progressPercentage) / 100;
-    const finalAmount = (data.contractValue * (100 - data.dpPercentage - data.progressPercentage)) / 100;
+    const finalAmount =
+      (data.contractValue *
+        (100 - data.dpPercentage - data.progressPercentage)) /
+      100;
 
     // Generate SPK number if not provided
     const spkNumber = generateSPKNumber();
@@ -99,7 +102,11 @@ export async function publishSPK(spkId: string) {
 
     // Trigger n8n webhook for SPK published
     if (process.env.N8N_WEBHOOK_SPK_PUBLISHED) {
-      const pdfUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/pdf/${spkId}`;
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const pdfUrl = `${baseUrl}/api/pdf/${spkId}`;
+      const vendorLink = `${baseUrl}/vendor?spkId=${spkId}`;
+
       await fetch(process.env.N8N_WEBHOOK_SPK_PUBLISHED, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -111,6 +118,7 @@ export async function publishSPK(spkId: string) {
           contractValue: spk.contract_value,
           currency: spk.currency,
           pdfUrl: pdfUrl,
+          vendorLink: vendorLink,
         }),
       });
     }
