@@ -13,6 +13,10 @@ import { formatCurrency } from "@/lib/utils";
 import { Download, FileText } from "lucide-react";
 import Link from "next/link";
 
+// Force dynamic rendering to prevent caching
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function getVendorSPK(spkId: string) {
   try {
     const { data: spk, error } = await supabaseAdmin

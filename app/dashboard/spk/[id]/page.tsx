@@ -15,6 +15,10 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { ArrowLeft, Download } from "lucide-react";
 import Link from "next/link";
 
+// Force dynamic rendering to prevent caching
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function SPKDetailPage({
   params,
 }: {

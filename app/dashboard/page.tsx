@@ -7,6 +7,10 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { FileText, Plus } from "lucide-react";
 import Link from "next/link";
 
+// Force dynamic rendering to prevent caching
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function DashboardPage() {
   const result = await getSPKList();
   const spks = result.success ? result.data : [];
