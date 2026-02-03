@@ -19,6 +19,10 @@ export async function GET(
 
     const spk = result.data;
 
+    // Check if this is a preview request (inline) or download request (attachment)
+    const { searchParams } = new URL(request.url);
+    const isPreview = searchParams.get("preview") === "true";
+
     // Generate PDF stream
     const stream = await renderToStream(<SPKPDFTemplate spk={spk} />);
 
@@ -30,10 +34,13 @@ export async function GET(
     const buffer = Buffer.concat(chunks);
 
     // Return PDF with appropriate headers
+    // Use "inline" for preview (displays in browser), "attachment" for download
+    const disposition = isPreview ? "inline" : "attachment";
+
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${spk.spk_number}.pdf"`,
+        "Content-Disposition": `${disposition}; filename="${spk.spk_number}.pdf"`,
       },
     });
   } catch (error) {

@@ -175,11 +175,7 @@ export function SPKPDFTemplate({ spk }: SPKPDFTemplateProps) {
             {spk.payments.map((payment, index) => (
               <View key={index} style={styles.tableRow}>
                 <Text style={styles.tableCol}>
-                  {payment.term === "dp"
-                    ? "Down Payment"
-                    : payment.term === "progress"
-                    ? "Progress Payment"
-                    : "Final Payment"}
+                  {payment.term_name}
                 </Text>
                 <Text style={styles.tableCol}>{payment.percentage}%</Text>
                 <Text style={styles.tableCol}>
@@ -210,24 +206,6 @@ export function SPKPDFTemplate({ spk }: SPKPDFTemplateProps) {
             the agreed timeline and budget. Payment will be released according to
             the payment terms outlined above upon completion of each milestone.
           </Text>
-        </View>
-
-        {/* Signature Section */}
-        <View style={styles.section}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <View style={{ width: "45%" }}>
-              <Text>Authorized By:</Text>
-              <Text style={{ marginTop: 40, borderTop: "1pt solid #333", paddingTop: 5 }}>
-                Company Representative
-              </Text>
-            </View>
-            <View style={{ width: "45%" }}>
-              <Text>Acknowledged By:</Text>
-              <Text style={{ marginTop: 40, borderTop: "1pt solid #333", paddingTop: 5 }}>
-                Vendor Representative
-              </Text>
-            </View>
-          </View>
         </View>
 
         {/* Footer */}

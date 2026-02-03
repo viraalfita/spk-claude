@@ -1,4 +1,4 @@
-// Auto-generated Supabase types
+// Auto-generated Supabase types (Updated for dynamic payments)
 export interface Database {
   public: {
     Tables: {
@@ -12,19 +12,14 @@ export interface Database {
           project_name: string;
           project_description: string | null;
           contract_value: number;
-          currency: string;
+          currency: string; // IDR, USD, SGD, EUR, MYR, etc.
           start_date: string;
           end_date: string | null;
-          dp_percentage: number;
-          dp_amount: number;
-          progress_percentage: number;
-          progress_amount: number;
-          final_percentage: number;
-          final_amount: number;
           status: "draft" | "published";
           created_at: string;
           updated_at: string;
           created_by: string;
+          created_by_email: string;
           notes: string | null;
           pdf_url: string | null;
         };
@@ -38,10 +33,13 @@ export interface Database {
         Row: {
           id: string;
           spk_id: string;
-          term: "dp" | "progress" | "final";
+          term_name: string; // Dynamic, not enum
+          term_order: number; // Sequence: 1, 2, 3, ...
           amount: number;
-          percentage: number;
+          percentage: number | null; // Optional
+          input_type: "percentage" | "nominal";
           status: "pending" | "paid" | "overdue";
+          due_date: string | null;
           paid_date: string | null;
           payment_reference: string | null;
           updated_at: string;
@@ -49,20 +47,26 @@ export interface Database {
         };
         Insert: {
           spk_id: string;
-          term: "dp" | "progress" | "final";
+          term_name: string;
+          term_order: number;
           amount: number;
-          percentage: number;
-          status: "pending" | "paid" | "overdue";
+          percentage?: number | null;
+          input_type: "percentage" | "nominal";
+          status?: "pending" | "paid" | "overdue";
+          due_date?: string | null;
           paid_date?: string | null;
           payment_reference?: string | null;
           updated_by: string;
         };
         Update: {
           spk_id?: string;
-          term?: "dp" | "progress" | "final";
+          term_name?: string;
+          term_order?: number;
           amount?: number;
-          percentage?: number;
+          percentage?: number | null;
+          input_type?: "percentage" | "nominal";
           status?: "pending" | "paid" | "overdue";
+          due_date?: string | null;
           paid_date?: string | null;
           payment_reference?: string | null;
           updated_by?: string;

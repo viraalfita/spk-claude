@@ -7,12 +7,14 @@ import { Label } from "@/components/ui/label";
 import { updatePaymentStatus } from "@/app/actions/payment";
 import { Payment } from "@/lib/types";
 import { CheckCircle } from "lucide-react";
+import { useToast } from "@/components/ui/toast";
 
 interface PaymentStatusUpdateProps {
   payment: Payment;
 }
 
 export function PaymentStatusUpdate({ payment }: PaymentStatusUpdateProps) {
+  const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [paidDate, setPaidDate] = useState(
@@ -33,14 +35,25 @@ export function PaymentStatusUpdate({ payment }: PaymentStatusUpdateProps) {
       });
 
       if (result.success) {
-        alert("Payment status updated successfully!");
+        toast({
+          title: "Payment updated",
+          description: "Payment status updated successfully.",
+        });
         setIsEditing(false);
       } else {
-        alert(result.error || "Failed to update payment status");
+        toast({
+          title: "Failed to update payment",
+          description: result.error || "Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error(error);
-      alert("An error occurred while updating payment status");
+      toast({
+        title: "Something went wrong",
+        description: "An error occurred while updating payment status.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

@@ -68,17 +68,19 @@
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ┌────────────────┐          ┌────────────────┐                │
-│  │  n8n Webhooks  │          │  PDF Generator │                │
+│  │  Resend API    │          │  PDF Generator │                │
 │  ├────────────────┤          ├────────────────┤                │
-│  │ • SPK Published│          │ @react-pdf     │                │
-│  │ • Payment      │          │ • Template     │                │
-│  │   Updated      │          │ • Rendering    │                │
+│  │ • Email        │          │ @react-pdf     │                │
+│  │   Notifications│          │ • Template     │                │
+│  │ • Direct API   │          │ • Rendering    │                │
 │  └────────┬───────┘          └────────────────┘                │
 │           │                                                     │
 │           ▼                                                     │
 │  ┌────────────────┐                                             │
-│  │ Slack / Email  │                                             │
-│  │ Notifications  │                                             │
+│  │  Slack API     │                                             │
+│  │  (Webhooks)    │                                             │
+│  │ • Direct       │                                             │
+│  │   Integration  │                                             │
 │  └────────────────┘                                             │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
@@ -136,12 +138,13 @@ User Click "Publish"
          ├─► Update SPK status to "published"
          │   └─► Supabase UPDATE spk
          │
-         └─► Trigger n8n webhook
-             └─► POST to N8N_WEBHOOK_SPK_PUBLISHED
-                 └─► n8n workflow
-                     │
-                     ├─► Send Slack notification
-                     └─► Send email to vendor
+         ├─► Send Slack notification (automatic)
+         │   └─► POST to Slack Webhook URL
+         │       └─► Internal channel notification
+         │
+         └─► Send email (optional, user-triggered)
+             └─► Resend API call
+                 └─► Email to vendor with PDF link
 ```
 
 ### 3. Update Payment Flow
@@ -165,11 +168,9 @@ User Click "Mark as Paid"
          ├─► Update payment record
          │   └─► Supabase UPDATE payment
          │
-         └─► Trigger n8n webhook
-             └─► POST to N8N_WEBHOOK_PAYMENT_UPDATED
-                 └─► n8n workflow
-                     │
-                     └─► Notify vendor of payment
+         └─► Send Slack notification
+             └─► POST to Slack Webhook URL
+                 └─► Payment status update notification
 ```
 
 ### 4. PDF Generation Flow
@@ -250,26 +251,31 @@ lib/
 │                  SPK                     │
 ├─────────────────────────────────────────┤
 │ id (PK)                                  │
-│ spk_number (UNIQUE)                      │
+│ spk_number (UNIQUE, auto-gen, editable) │
 │ vendor_name                              │
 │ vendor_email                             │
 │ project_name                             │
 │ contract_value                           │
+│ currency (IDR, USD, SGD, EUR, etc.)     │
 │ status (draft|published)                 │
+│ created_by (auto from session)          │
+│ created_by_email                         │
 │ ...                                      │
 └───────────┬─────────────────────────────┘
             │
-            │ 1:N
+            │ 1:N (Dynamic - 1 to many payments)
             │
             ▼
 ┌─────────────────────────────────────────┐
-│                Payment                   │
+│          Payment (Dynamic)               │
 ├─────────────────────────────────────────┤
 │ id (PK)                                  │
 │ spk_id (FK) ──────────────────────┐     │
-│ term (dp|progress|final)          │     │
+│ term_name (flexible, not enum)    │     │
+│ term_order (1, 2, 3, ...)         │     │
 │ amount                             │     │
-│ percentage                         │     │
+│ percentage (nullable)              │     │
+│ input_type (percentage|nominal)   │     │
 │ status (pending|paid|overdue)     │     │
 │ paid_date                          │     │
 │ payment_reference                  │     │
@@ -332,12 +338,14 @@ lib/
 ## State Management
 
 ### Server State
+
 - Fetched via Server Actions
 - Cached by Next.js (automatic)
 - Revalidated on mutation
 - No client-side cache needed
 
 ### Client State
+
 - Form state: React useState
 - Form validation: Built-in HTML5
 - Loading states: Local component state
@@ -365,22 +373,25 @@ lib/
                 ├─► API routes (/api/pdf)
                 └─► Server Actions (createSPK, etc.)
                     │
-                    ▼
-        ┌───────────────────────┐
-        │   Supabase Cloud      │
-        │   (PostgreSQL)        │
-        └───────────────────────┘
+                    ├───────────────┐
+                    │               │
+                    ▼               ▼
+        ┌───────────────────┐   ┌──────────────┐
+        │  Supabase Cloud   │   │  Resend API  │
+        │  (PostgreSQL)     │   │  (Email)     │
+        └───────────────────┘   └──────────────┘
                     │
                     ▼
         ┌───────────────────────┐
-        │   n8n Instance        │
-        │   (Self-hosted/Cloud) │
+        │      Slack API        │
+        │   (Notifications)     │
         └───────────────────────┘
 ```
 
 ## Technology Decisions
 
 ### Why Next.js 14?
+
 - App Router for modern React patterns
 - Server Components reduce client bundle
 - Server Actions simplify data mutations
@@ -388,6 +399,7 @@ lib/
 - Great developer experience
 
 ### Why Supabase?
+
 - PostgreSQL with generous free tier
 - Built-in authentication (ready to use)
 - Row Level Security for data protection
@@ -395,6 +407,7 @@ lib/
 - Easy setup and deployment
 
 ### Why @react-pdf/renderer?
+
 - Server-side PDF generation
 - React component syntax
 - No external dependencies (like Puppeteer)
@@ -402,6 +415,7 @@ lib/
 - Full styling control
 
 ### Why shadcn/ui?
+
 - Copy-paste components (no dependencies)
 - Built on Radix UI (accessible)
 - Customizable with Tailwind
@@ -411,12 +425,14 @@ lib/
 ## Scalability Considerations
 
 ### Current Limits (PoC)
+
 - Database: Supabase free tier (500MB, 2GB bandwidth)
 - Concurrent users: Tested for small team
 - File storage: Not implemented yet
 - PDF generation: Synchronous (OK for <100 PDFs/day)
 
 ### Scale-Up Path
+
 1. Upgrade Supabase plan for more resources
 2. Add Redis for caching
 3. Queue PDF generation (BullMQ, etc.)
@@ -428,6 +444,7 @@ lib/
 ## Monitoring & Observability
 
 ### Recommended Setup
+
 - **Error Tracking**: Sentry or similar
 - **Analytics**: Vercel Analytics or Google Analytics
 - **Logging**: Supabase logs + custom logging
@@ -435,6 +452,7 @@ lib/
 - **Uptime**: Uptime monitoring service
 
 ### Key Metrics to Track
+
 - SPK creation time
 - PDF generation time
 - Database query performance
@@ -445,11 +463,13 @@ lib/
 ## Backup & Recovery
 
 ### Database Backups
+
 - Supabase automatic daily backups
 - Point-in-time recovery available
 - Manual backup via pg_dump
 
 ### Disaster Recovery Plan
+
 1. Database restore from Supabase backup
 2. Redeploy application from git
 3. Reconfigure environment variables
@@ -459,6 +479,7 @@ lib/
 ## Future Architecture Enhancements
 
 ### Phase 2 (Potential)
+
 - Real-time payment updates (Supabase Realtime)
 - File upload for attachments (Supabase Storage)
 - Advanced search (PostgreSQL full-text search)
@@ -466,6 +487,7 @@ lib/
 - Email queue (for bulk notifications)
 
 ### Phase 3 (Production)
+
 - Multi-tenancy support
 - Role-based access control (RBAC)
 - Advanced analytics dashboard
@@ -476,6 +498,7 @@ lib/
 ## Conclusion
 
 The architecture is designed for:
+
 - ✅ Simplicity (easy to understand and maintain)
 - ✅ Scalability (can grow with needs)
 - ✅ Security (RLS, environment variables)

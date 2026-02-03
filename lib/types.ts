@@ -1,27 +1,22 @@
-// Database types matching Supabase schema
+// Database types matching updated Supabase schema
 
 export interface SPK {
   id: string;
-  spk_number: string;
+  spk_number: string; // Auto-generated, but editable
   vendor_name: string;
   vendor_email: string | null;
   vendor_phone: string | null;
   project_name: string;
   project_description: string | null;
   contract_value: number;
-  currency: string;
+  currency: string; // IDR, USD, SGD, EUR, MYR, etc.
   start_date: string;
   end_date: string | null;
-  dp_percentage: number;
-  dp_amount: number;
-  progress_percentage: number;
-  progress_amount: number;
-  final_percentage: number;
-  final_amount: number;
   status: "draft" | "published";
   created_at: string;
   updated_at: string;
-  created_by: string;
+  created_by: string; // Auto from session
+  created_by_email: string; // Auto from session
   notes: string | null;
   pdf_url: string | null;
 }
@@ -29,12 +24,16 @@ export interface SPK {
 export interface Payment {
   id: string;
   spk_id: string;
-  term: "dp" | "progress" | "final";
+  term_name: string; // Dynamic: "Down Payment", "Progress 1", etc.
+  term_order: number; // Sequence: 1, 2, 3, ...
   amount: number;
-  percentage: number;
+  percentage: number | null; // Optional
+  input_type: "percentage" | "nominal";
   status: "pending" | "paid" | "overdue";
+  due_date: string | null;
   paid_date: string | null;
   payment_reference: string | null;
+  description: string | null; // Optional description for the payment term
   updated_at: string;
   updated_by: string;
 }
@@ -49,19 +48,28 @@ export interface Vendor {
 }
 
 // Form data types
+export interface PaymentTerm {
+  term_name: string;
+  term_order: number;
+  amount: number;
+  percentage?: number | null;
+  input_type: "percentage" | "nominal";
+  due_date?: string;
+  description?: string;
+}
+
 export interface CreateSPKFormData {
+  spkNumber?: string; // Optional, will be auto-generated if not provided
   vendorName: string;
   vendorEmail?: string;
   vendorPhone?: string;
   projectName: string;
   projectDescription?: string;
   contractValue: number;
-  currency: string;
+  currency: string; // IDR, USD, SGD, EUR, MYR, etc.
   startDate: string;
   endDate?: string;
-  dpPercentage: number;
-  progressPercentage: number;
-  finalPercentage: number;
+  paymentTerms: PaymentTerm[]; // Dynamic array of payment terms
   notes?: string;
 }
 
@@ -70,6 +78,7 @@ export interface UpdatePaymentFormData {
   status: "pending" | "paid" | "overdue";
   paidDate?: string;
   paymentReference?: string;
+  sendEmail?: boolean; // Optional: whether to send email notification
 }
 
 // Combined types for display
@@ -77,12 +86,18 @@ export interface SPKWithPayments extends SPK {
   payments: Payment[];
 }
 
-// Payment term labels
-export const PAYMENT_TERM_LABELS: Record<Payment["term"], string> = {
-  dp: "Down Payment",
-  progress: "Progress Payment",
-  final: "Final Payment",
-};
+// Currency options
+export const CURRENCY_OPTIONS = [
+  { value: "IDR", label: "IDR - Indonesian Rupiah", symbol: "Rp" },
+  { value: "USD", label: "USD - US Dollar", symbol: "$" },
+  { value: "SGD", label: "SGD - Singapore Dollar", symbol: "S$" },
+  { value: "EUR", label: "EUR - Euro", symbol: "€" },
+  { value: "MYR", label: "MYR - Malaysian Ringgit", symbol: "RM" },
+  { value: "etc", label: "etc - Other", symbol: "" },
+] as const;
+
+// Simple currency list for forms
+export const CURRENCIES = ["IDR", "USD", "SGD", "EUR", "MYR", "etc"] as const;
 
 // Status badge colors
 export const STATUS_COLORS = {

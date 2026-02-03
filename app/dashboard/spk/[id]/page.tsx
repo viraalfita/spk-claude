@@ -1,5 +1,6 @@
 import { getSPKWithPayments } from "@/app/actions/spk";
 import { PaymentStatusUpdate } from "@/components/payment-status-update";
+import { PDFPreviewButton } from "@/components/pdf-preview-button";
 import { PublishSPKButton } from "@/components/publish-spk-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,9 +11,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { PAYMENT_TERM_LABELS, Payment, STATUS_COLORS } from "@/lib/types";
+import { Payment, STATUS_COLORS } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { ArrowLeft, Download } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 // Force dynamic rendering to prevent caching
@@ -77,13 +78,13 @@ export default async function SPKDetailPage({
           </CardHeader>
           <CardContent>
             <div className="flex gap-4">
-              {spk.status === "draft" && <PublishSPKButton spkId={spk.id} />}
-              <Link href={`/api/pdf/${spk.id}`} target="_blank">
-                <Button variant="outline">
-                  <Download className="mr-2 h-4 w-4" />
-                  Download PDF
-                </Button>
-              </Link>
+              {spk.status === "draft" && (
+                <PublishSPKButton
+                  spkId={spk.id}
+                  vendorEmail={spk.vendor_email}
+                />
+              )}
+              <PDFPreviewButton spkId={spk.id} spkNumber={spk.spk_number} />
             </div>
           </CardContent>
         </Card>
@@ -167,7 +168,9 @@ export default async function SPKDetailPage({
           <CardHeader>
             <CardTitle>Payment Tracking</CardTitle>
             <CardDescription>
-              Track payment milestones and update status
+              {spk.payments.length} payment{" "}
+              {spk.payments.length === 1 ? "term" : "terms"} • Track payment
+              milestones and update status
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -178,15 +181,28 @@ export default async function SPKDetailPage({
                   className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h4 className="font-semibold">
-                        {PAYMENT_TERM_LABELS[payment.term]}
-                      </h4>
-                      <p className="text-sm text-gray-500">
-                        {payment.percentage}% of contract value
-                      </p>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
+                          {payment.term_order}
+                        </span>
+                        <h4 className="font-semibold">{payment.term_name}</h4>
+                      </div>
+                      {payment.description && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          {payment.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                        {payment.percentage !== null && (
+                          <span>{payment.percentage}% of contract</span>
+                        )}
+                        {payment.due_date && (
+                          <span>Due: {formatDate(payment.due_date)}</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right ml-4">
                       <p className="text-lg font-bold">
                         {formatCurrency(payment.amount, spk.currency)}
                       </p>
@@ -197,7 +213,7 @@ export default async function SPKDetailPage({
                   </div>
 
                   {payment.paid_date && (
-                    <div className="mb-3">
+                    <div className="mb-3 pt-3 border-t">
                       <p className="text-sm text-gray-500">
                         Paid on: {formatDate(payment.paid_date)}
                       </p>

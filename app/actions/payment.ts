@@ -1,5 +1,7 @@
 "use server";
 
+import { sendPaymentUpdateEmail } from "@/lib/email";
+import { notifyPaymentUpdated } from "@/lib/slack";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { UpdatePaymentFormData } from "@/lib/types";
 import { revalidatePath } from "next/cache";
@@ -22,45 +24,19 @@ export async function updatePaymentStatus(data: UpdatePaymentFormData) {
 
     if (error) throw error;
 
-    // Trigger n8n webhook for payment status updated
-    if (process.env.N8N_WEBHOOK_PAYMENT_UPDATED && payment.spk) {
-      await fetch(process.env.N8N_WEBHOOK_PAYMENT_UPDATED, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event: "payment.updated",
-          id: payment.spk.id,
-          spkNumber: payment.spk.spk_number,
-          vendorName: payment.spk.vendor_name,
-          vendorEmail: payment.spk.vendor_email,
-          vendorPhone: payment.spk.vendor_phone,
-          projectName: payment.spk.project_name,
-          projectDescription: payment.spk.project_description,
-          contractValue: payment.spk.contract_value,
-          currency: payment.spk.currency,
-          startDate: payment.spk.start_date,
-          endDate: payment.spk.end_date,
-          dpPercentage: payment.spk.dp_percentage,
-          dpAmount: payment.spk.dp_amount,
-          progressPercentage: payment.spk.progress_percentage,
-          progressAmount: payment.spk.progress_amount,
-          finalPercentage: payment.spk.final_percentage,
-          finalAmount: payment.spk.final_amount,
-          status: payment.spk.status,
-          createdAt: payment.spk.created_at,
-          updatedAt: payment.spk.updated_at,
-          createdBy: payment.spk.created_by,
-          notes: payment.spk.notes,
-          paymentId: payment.id,
-          paymentTerm: payment.term,
-          paymentAmount: payment.amount,
-          paymentPercentage: payment.percentage,
-          paymentStatus: payment.status,
-          paymentPaidDate: payment.paid_date,
-          paymentReference: payment.payment_reference,
-          paymentUpdatedAt: payment.updated_at,
-          paymentUpdatedBy: payment.updated_by,
-        }),
+    // Send Slack notification (automatic)
+    if (payment.spk) {
+      await notifyPaymentUpdated(payment.spk, payment, updateData.updated_by);
+    }
+
+    // Send email notification (optional)
+    if (data.sendEmail && payment.spk && payment.spk.vendor_email) {
+      await sendPaymentUpdateEmail({
+        to: payment.spk.vendor_email,
+        spk: payment.spk,
+        paymentTermName: payment.term_name,
+        paymentStatus: payment.status,
+        paymentAmount: payment.amount,
       });
     }
 
@@ -79,7 +55,7 @@ export async function getPaymentsBySPK(spkId: string) {
       .from("payment")
       .select("*")
       .eq("spk_id", spkId)
-      .order("term", { ascending: true });
+      .order("term_order", { ascending: true }); // Order by term_order instead of term
 
     if (error) throw error;
 

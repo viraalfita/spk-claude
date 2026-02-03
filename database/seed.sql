@@ -1,13 +1,11 @@
--- Sample SPK data for testing
+-- Sample SPK data for testing (Updated for dynamic payments)
 
--- Sample SPK 1: Office Renovation Project
+-- Sample SPK 1: Office Renovation (3 payment terms - standard)
 INSERT INTO spk (
   spk_number, vendor_name, vendor_email, vendor_phone,
   project_name, project_description, contract_value, currency,
   start_date, end_date,
-  dp_percentage, dp_amount, progress_percentage, progress_amount,
-  final_percentage, final_amount,
-  status, created_by, notes
+  status, created_by, created_by_email, notes
 ) VALUES (
   'SPK-2026-001',
   'PT Vendor Jaya',
@@ -19,22 +17,18 @@ INSERT INTO spk (
   'IDR',
   '2026-01-21',
   '2026-03-21',
-  30, 30000000,
-  40, 40000000,
-  30, 30000000,
   'published',
+  'Admin User',
   'admin@company.com',
   'Urgent project - prioritize quality materials'
 );
 
--- Sample SPK 2: Website Development
+-- Sample SPK 2: Website Development (USD currency, 2 terms)
 INSERT INTO spk (
   spk_number, vendor_name, vendor_email, vendor_phone,
   project_name, project_description, contract_value, currency,
   start_date, end_date,
-  dp_percentage, dp_amount, progress_percentage, progress_amount,
-  final_percentage, final_amount,
-  status, created_by, notes
+  status, created_by, created_by_email, notes
 ) VALUES (
   'SPK-2026-002',
   'Digital Solutions Indonesia',
@@ -42,81 +36,79 @@ INSERT INTO spk (
   '+62-821-9876-5432',
   'Corporate Website Redesign',
   'Modern, responsive website with CMS integration and SEO optimization',
-  75000000,
-  'IDR',
+  5000,
+  'USD',
   '2026-01-22',
   '2026-04-22',
-  25, 18750000,
-  50, 37500000,
-  25, 18750000,
   'published',
+  'Project Manager',
   'pm@company.com',
   'Requires staging environment for client review'
 );
 
--- Sample SPK 3: Draft Project
+-- Sample SPK 3: Construction Project (5 payment terms - complex)
 INSERT INTO spk (
   spk_number, vendor_name, vendor_email,
   project_name, contract_value, currency,
   start_date,
-  dp_percentage, dp_amount, progress_percentage, progress_amount,
-  final_percentage, final_amount,
-  status, created_by
+  status, created_by, created_by_email
 ) VALUES (
   'SPK-2026-003',
   'PT Konstruksi Mandiri',
   'info@konstruksimandiri.com',
   'Parking Lot Expansion',
-  150000000,
+  250000000,
   'IDR',
   '2026-02-01',
-  30, 45000000,
-  40, 60000000,
-  30, 45000000,
   'draft',
+  'Admin User',
   'admin@company.com'
 );
 
--- Payments for SPK-001 (Office Renovation)
-INSERT INTO payment (spk_id, term, amount, percentage, status, paid_date, payment_reference, updated_by)
+-- Payments for SPK-001 (3 terms using percentage)
+INSERT INTO payment (spk_id, term_name, term_order, amount, percentage, input_type, status, paid_date, payment_reference, updated_by)
 SELECT
-  id, 'dp', 30000000, 30, 'paid', '2026-01-21', 'TRX-20260121-001', 'finance@company.com'
+  id, 'Down Payment', 1, 30000000, 30, 'percentage', 'paid', '2026-01-21', 'TRX-20260121-001', 'finance@company.com'
 FROM spk WHERE spk_number = 'SPK-2026-001'
 UNION ALL
 SELECT
-  id, 'progress', 40000000, 40, 'pending', NULL, NULL, 'admin@company.com'
+  id, 'Progress Payment', 2, 40000000, 40, 'percentage', 'pending', NULL, NULL, 'admin@company.com'
 FROM spk WHERE spk_number = 'SPK-2026-001'
 UNION ALL
 SELECT
-  id, 'final', 30000000, 30, 'pending', NULL, NULL, 'admin@company.com'
+  id, 'Final Payment', 3, 30000000, 30, 'percentage', 'pending', NULL, NULL, 'admin@company.com'
 FROM spk WHERE spk_number = 'SPK-2026-001';
 
--- Payments for SPK-002 (Website Development)
-INSERT INTO payment (spk_id, term, amount, percentage, status, paid_date, payment_reference, updated_by)
+-- Payments for SPK-002 (2 terms - using nominal amounts in USD)
+INSERT INTO payment (spk_id, term_name, term_order, amount, percentage, input_type, status, paid_date, payment_reference, updated_by)
 SELECT
-  id, 'dp', 18750000, 25, 'paid', '2026-01-22', 'TRX-20260122-001', 'finance@company.com'
+  id, 'Initial Payment', 1, 2500, 50, 'nominal', 'paid', '2026-01-22', 'USD-TRX-001', 'finance@company.com'
 FROM spk WHERE spk_number = 'SPK-2026-002'
 UNION ALL
 SELECT
-  id, 'progress', 37500000, 50, 'pending', NULL, NULL, 'pm@company.com'
-FROM spk WHERE spk_number = 'SPK-2026-002'
-UNION ALL
-SELECT
-  id, 'final', 18750000, 25, 'pending', NULL, NULL, 'pm@company.com'
+  id, 'Final Payment', 2, 2500, 50, 'nominal', 'pending', NULL, NULL, 'pm@company.com'
 FROM spk WHERE spk_number = 'SPK-2026-002';
 
--- Payments for SPK-003 (Draft)
-INSERT INTO payment (spk_id, term, amount, percentage, status, updated_by)
+-- Payments for SPK-003 (5 terms - mixed percentage)
+INSERT INTO payment (spk_id, term_name, term_order, amount, percentage, input_type, status, updated_by)
 SELECT
-  id, 'dp', 45000000, 30, 'pending', 'admin@company.com'
+  id, 'Down Payment', 1, 50000000, 20, 'percentage', 'pending', 'admin@company.com'
 FROM spk WHERE spk_number = 'SPK-2026-003'
 UNION ALL
 SELECT
-  id, 'progress', 60000000, 40, 'pending', 'admin@company.com'
+  id, 'Progress 1 - Foundation', 2, 50000000, 20, 'percentage', 'pending', 'admin@company.com'
 FROM spk WHERE spk_number = 'SPK-2026-003'
 UNION ALL
 SELECT
-  id, 'final', 45000000, 30, 'pending', 'admin@company.com'
+  id, 'Progress 2 - Structure', 3, 50000000, 20, 'percentage', 'pending', 'admin@company.com'
+FROM spk WHERE spk_number = 'SPK-2026-003'
+UNION ALL
+SELECT
+  id, 'Progress 3 - Finishing', 4, 50000000, 20, 'percentage', 'pending', 'admin@company.com'
+FROM spk WHERE spk_number = 'SPK-2026-003'
+UNION ALL
+SELECT
+  id, 'Final Payment', 5, 50000000, 20, 'percentage', 'pending', 'admin@company.com'
 FROM spk WHERE spk_number = 'SPK-2026-003';
 
 -- Sample Vendors (Optional table)

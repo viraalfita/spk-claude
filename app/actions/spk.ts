@@ -1,24 +1,49 @@
 "use server";
 
+import { sendSPKCreatedEmail } from "@/lib/email";
+import { notifySPKPublished } from "@/lib/slack";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { CreateSPKFormData } from "@/lib/types";
+import { CreateSPKFormData, SPKWithPayments } from "@/lib/types";
 import { generateSPKNumber } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 
+// Helper to get user session (placeholder - implement based on your auth strategy)
+async function getUserSession() {
+  // TODO: Implement actual session retrieval
+  // For now, return a mock session
+  return {
+    user: {
+      name: "Admin User",
+      email: "admin@company.com",
+    },
+  };
+}
+
 export async function createSPK(data: CreateSPKFormData) {
   try {
-    // Calculate payment amounts based on percentages
-    const dpAmount = (data.contractValue * data.dpPercentage) / 100;
-    const progressAmount = (data.contractValue * data.progressPercentage) / 100;
-    const finalAmount =
-      (data.contractValue *
-        (100 - data.dpPercentage - data.progressPercentage)) /
-      100;
+    const session = await getUserSession();
 
-    // Generate SPK number if not provided
-    const spkNumber = generateSPKNumber();
+    // Generate SPK number if not provided or check uniqueness if provided
+    let spkNumber = data.spkNumber?.trim();
+    if (!spkNumber || spkNumber === "") {
+      spkNumber = generateSPKNumber();
+    } else {
+      // Check if SPK number already exists
+      const { data: existing } = await supabaseAdmin
+        .from("spk")
+        .select("id")
+        .eq("spk_number", spkNumber)
+        .single();
 
-    // Create SPK record
+      if (existing) {
+        return {
+          success: false,
+          error: `SPK number ${spkNumber} already exists`,
+        };
+      }
+    }
+
+    // Create SPK record (without hardcoded payment fields)
     const { data: spk, error: spkError } = await supabaseAdmin
       .from("spk")
       .insert({
@@ -32,14 +57,9 @@ export async function createSPK(data: CreateSPKFormData) {
         currency: data.currency,
         start_date: data.startDate,
         end_date: data.endDate || null,
-        dp_percentage: data.dpPercentage,
-        dp_amount: dpAmount,
-        progress_percentage: data.progressPercentage,
-        progress_amount: progressAmount,
-        final_percentage: 100 - data.dpPercentage - data.progressPercentage,
-        final_amount: finalAmount,
         status: "draft",
-        created_by: "admin@company.com", // TODO: Get from auth session
+        created_by: session.user.name,
+        created_by_email: session.user.email,
         notes: data.notes || null,
       })
       .select()
@@ -47,33 +67,18 @@ export async function createSPK(data: CreateSPKFormData) {
 
     if (spkError) throw spkError;
 
-    // Create payment records
-    const payments = [
-      {
-        spk_id: spk.id,
-        term: "dp" as const,
-        amount: dpAmount,
-        percentage: data.dpPercentage,
-        status: "pending" as const,
-        updated_by: "admin@company.com",
-      },
-      {
-        spk_id: spk.id,
-        term: "progress" as const,
-        amount: progressAmount,
-        percentage: data.progressPercentage,
-        status: "pending" as const,
-        updated_by: "admin@company.com",
-      },
-      {
-        spk_id: spk.id,
-        term: "final" as const,
-        amount: finalAmount,
-        percentage: 100 - data.dpPercentage - data.progressPercentage,
-        status: "pending" as const,
-        updated_by: "admin@company.com",
-      },
-    ];
+    // Create dynamic payment records
+    const payments = data.paymentTerms.map((term, index) => ({
+      spk_id: spk.id,
+      term_name: term.term_name,
+      term_order: term.term_order || index + 1,
+      amount: term.amount,
+      percentage: term.percentage || null,
+      input_type: term.input_type,
+      due_date: term.due_date || null,
+      status: "pending" as const,
+      updated_by: session.user.email,
+    }));
 
     const { error: paymentError } = await supabaseAdmin
       .from("payment")
@@ -89,8 +94,9 @@ export async function createSPK(data: CreateSPKFormData) {
   }
 }
 
-export async function publishSPK(spkId: string) {
+export async function publishSPK(spkId: string, sendEmail: boolean = false) {
   try {
+    // Update SPK status
     const { data: spk, error } = await supabaseAdmin
       .from("spk")
       .update({ status: "published" })
@@ -100,36 +106,25 @@ export async function publishSPK(spkId: string) {
 
     if (error) throw error;
 
-    // Trigger n8n webhook for SPK published
-    if (process.env.N8N_WEBHOOK_SPK_PUBLISHED) {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
-      if (!baseUrl) {
-        throw new Error(
-          "NEXT_PUBLIC_APP_URL is not set in environment variables",
-        );
-      }
-      const pdfUrl = `${baseUrl}/api/pdf/${spkId}`;
-      const vendorLink = `${baseUrl}/vendor?spkId=${spkId}`;
+    // Generate PDF URL for sharing
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const pdfUrl = `${baseUrl}/api/pdf/${spkId}`;
 
-      await fetch(process.env.N8N_WEBHOOK_SPK_PUBLISHED, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          spkNumber: spk.spk_number,
-          vendorName: spk.vendor_name,
-          vendorEmail: spk.vendor_email,
-          projectName: spk.project_name,
-          contractValue: spk.contract_value,
-          currency: spk.currency,
-          pdfUrl: pdfUrl,
-          vendorLink: vendorLink,
-        }),
+    // Send Slack notification (automatic)
+    await notifySPKPublished(spk);
+
+    // Send email notification (optional, user-triggered)
+    if (sendEmail && spk.vendor_email) {
+      await sendSPKCreatedEmail({
+        to: spk.vendor_email,
+        spk,
+        pdfUrl,
       });
     }
 
     revalidatePath("/dashboard");
     revalidatePath(`/dashboard/spk/${spkId}`);
-    return { success: true, data: spk };
+    return { success: true, data: spk, pdfUrl };
   } catch (error) {
     console.error("Error publishing SPK:", error);
     return { success: false, error: "Failed to publish SPK" };
@@ -158,7 +153,9 @@ export async function getSPKList(status?: "draft" | "published") {
   }
 }
 
-export async function getSPKWithPayments(spkId: string) {
+export async function getSPKWithPayments(
+  spkId: string,
+): Promise<{ success: boolean; data?: SPKWithPayments; error?: string }> {
   try {
     const { data: spk, error: spkError } = await supabaseAdmin
       .from("spk")
@@ -172,7 +169,7 @@ export async function getSPKWithPayments(spkId: string) {
       .from("payment")
       .select("*")
       .eq("spk_id", spkId)
-      .order("term", { ascending: true });
+      .order("term_order", { ascending: true }); // Order by term_order instead of term
 
     if (paymentError) throw paymentError;
 
@@ -180,5 +177,51 @@ export async function getSPKWithPayments(spkId: string) {
   } catch (error) {
     console.error("Error fetching SPK details:", error);
     return { success: false, error: "Failed to fetch SPK details" };
+  }
+}
+
+export async function updateSPK(
+  spkId: string,
+  data: Partial<CreateSPKFormData>,
+) {
+  try {
+    const { error } = await supabaseAdmin
+      .from("spk")
+      .update({
+        vendor_name: data.vendorName,
+        vendor_email: data.vendorEmail || null,
+        vendor_phone: data.vendorPhone || null,
+        project_name: data.projectName,
+        project_description: data.projectDescription || null,
+        contract_value: data.contractValue,
+        currency: data.currency,
+        start_date: data.startDate,
+        end_date: data.endDate || null,
+        notes: data.notes || null,
+      })
+      .eq("id", spkId);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard");
+    revalidatePath(`/dashboard/spk/${spkId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating SPK:", error);
+    return { success: false, error: "Failed to update SPK" };
+  }
+}
+
+export async function deleteSPK(spkId: string) {
+  try {
+    const { error } = await supabaseAdmin.from("spk").delete().eq("id", spkId);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard");
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting SPK:", error);
+    return { success: false, error: "Failed to delete SPK" };
   }
 }

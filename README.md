@@ -2,34 +2,50 @@
 
 A digital SPK (Surat Perintah Kerja / Work Order) creation and payment tracking system built with Next.js 14, TypeScript, Tailwind CSS, and Supabase.
 
-## Features
+## ✨ Features
 
-- **SPK Creation**: Create and manage work orders with vendor and project details
-- **Payment Tracking**: Track payment milestones (Down Payment, Progress Payment, Final Payment)
-- **PDF Generation**: Generate official SPK PDF documents
-- **Admin Dashboard**: Manage all SPKs and update payment statuses
-- **Vendor Portal**: Read-only access for vendors to view their SPKs and payment status
-- **n8n Integration**: Automated notifications via webhooks (Slack, Email)
+### Core Features
+
+- **Dynamic SPK Creation**: Multi-step form with auto-generated SPK numbers (editable)
+- **Flexible Payment Terms**: Support for 1x, 2x, 3x, or more payment terms with add/remove functionality
+- **Multiple Currencies**: IDR, USD, SGD, EUR, and more (no automatic conversion)
+- **PDF Generation & Sharing**: Generate official SPK PDFs with shareable links
+- **Payment Tracking**: Real-time payment status updates with manual marking
+- **Admin Dashboard**: Comprehensive SPK and payment management
+- **Vendor Portal**: Read-only access for vendors via shareable links
+
+### Integrations
+
+- **Email Notifications**: Direct integration with Resend API (optional, user-triggered)
+- **Slack Notifications**: Automatic internal notifications via Slack webhooks
+- **PDF Preview**: In-app document preview before sharing
+
+### UX Improvements
+
+- **Step Form**: Clear progress indicator through 4-step SPK creation process
+- **Auto-Population**: SPK Maker information automatically captured from user session
 - **Responsive Design**: Mobile-friendly interface using shadcn/ui components
 
-## Tech Stack
+## 🛠️ Tech Stack
 
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 14 (App Router with Server Actions)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **UI Components**: shadcn/ui (Radix UI + Tailwind)
 - **Database**: Supabase (PostgreSQL)
 - **PDF Generation**: @react-pdf/renderer
+- **Email Service**: Resend
+- **Notifications**: Slack Webhooks/API
 - **Form Handling**: React Hook Form + Zod
-- **Automation**: n8n webhooks
 
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
 
 - Node.js 18+ and npm
 - Supabase account (free tier works)
-- n8n instance (optional, for notifications)
+- Resend API key (for email notifications)
+- Slack Webhook URL (for notifications)
 
 ### Installation
 
@@ -47,7 +63,6 @@ npm install
 ```
 
 3. **Set up Supabase**
-
    - Create a new Supabase project at [supabase.com](https://supabase.com)
    - Go to the SQL Editor and run the schema from `database/schema.sql`
    - Optionally, run `database/seed.sql` for sample data
@@ -60,7 +75,7 @@ npm install
 cp .env.local.example .env.local
 ```
 
-   Update the values:
+Update the values:
 
 ```env
 # Supabase Configuration
@@ -68,14 +83,21 @@ NEXT_PUBLIC_SUPABASE_URL=your-project-url.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# n8n Webhook URLs (optional)
-N8N_WEBHOOK_SPK_PUBLISHED=https://your-n8n-instance.com/webhook/spk-published
-N8N_WEBHOOK_PAYMENT_UPDATED=https://your-n8n-instance.com/webhook/payment-updated
+# Resend (Email Service)
+RESEND_API_KEY=re_xxxxxxxxxxxx
+
+# Slack Notifications
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxxxx
+# OR use Slack Bot Token for more control
+SLACK_BOT_TOKEN=xoxb-xxxxxxxxxxxxx
+SLACK_CHANNEL_ID=C0XXXXXXXXX
 ```
 
-   Find your Supabase keys:
-   - Go to Project Settings > API
-   - Copy `URL`, `anon public` key, and `service_role` key
+**Where to get the keys:**
+
+- **Supabase**: Project Settings > API (URL, anon public, service_role)
+- **Resend**: Sign up at [resend.com](https://resend.com) > API Keys
+- **Slack**: Create Incoming Webhook at [api.slack.com/apps](https://api.slack.com/apps)
 
 5. **Run the development server**
 
@@ -83,7 +105,7 @@ N8N_WEBHOOK_PAYMENT_UPDATED=https://your-n8n-instance.com/webhook/payment-update
 npm run dev
 ```
 
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Project Structure
 
@@ -118,112 +140,190 @@ spk-claude/
 └── public/               # Static assets
 ```
 
-## Core Workflows
+## 📋 Core Workflows
 
 ### 1. Create and Publish SPK
 
-1. Admin navigates to Dashboard
+1. Admin logs in and navigates to Dashboard
 2. Clicks "Create New SPK"
-3. Fills in vendor, project, and payment details
-4. Saves as draft
-5. Reviews and publishes
-6. System generates PDF and triggers n8n webhook
-7. Vendor receives email notification
+3. System auto-generates SPK number (editable if needed)
+4. Fills out multi-step form:
+   - **Step 1**: Vendor & Project Details
+   - **Step 2**: Contract Value & Currency Selection
+   - **Step 3**: Dynamic Payment Terms (add/remove as needed)
+   - **Step 4**: Review & Confirm
+5. Saves as draft OR publishes immediately
+6. On publish:
+   - PDF generated and preview available
+   - Shareable link created
+   - Slack notification sent automatically to internal channel
+7. Admin can optionally send email to vendor with PDF link
 
 ### 2. Update Payment Status
 
 1. Admin opens SPK detail page
-2. Finds the payment term (DP, Progress, Final)
+2. Finds the payment term in the list
 3. Clicks "Mark as Paid"
 4. Enters payment date and reference
 5. Confirms update
-6. System triggers n8n webhook
-7. Vendor receives payment confirmation
+6. System sends Slack notification automatically
+7. Admin can optionally notify vendor via email
 
 ### 3. Vendor Views SPK
 
-1. Vendor receives email with access link
-2. Opens vendor dashboard
-3. Views list of assigned SPKs
-4. Checks payment status
-5. Downloads PDF if needed
+1. Vendor receives email with shareable link OR accesses public link
+2. Opens SPK detail page
+3. Views SPK and project details
+4. Checks payment status for all terms
+5. Can preview or download PDF
 
-## Database Schema
+## 📊 Database Schema
 
-### Tables
+### Key Tables
 
-- **spk**: Work order records
-- **payment**: Payment milestone records
+- **spk**: Work order records with dynamic structure
+  - Auto-generated SPK numbers
+  - Multiple currency support
+  - Created by info (auto-populated)
+- **payment**: Dynamic payment milestone records
+  - Flexible term names and ordering
+  - Support for percentage or nominal amounts
+  - Input type tracking
 - **vendor**: Vendor information (optional)
 
 See `database/schema.sql` for complete schema definition.
 
-## API Routes
+### Schema Highlights
 
-- `GET /api/pdf/[id]`: Generate and download SPK PDF
-
-## Server Actions
-
-- `createSPK`: Create new SPK record
-- `publishSPK`: Publish SPK and trigger notifications
-- `getSPKList`: Fetch all SPKs
-- `getSPKWithPayments`: Fetch SPK with payment details
-- `updatePaymentStatus`: Update payment status and trigger notifications
-
-## n8n Integration
-
-Configure n8n webhooks for automated notifications:
-
-1. **SPK Published**: Sends Slack message + email to vendor
-2. **Payment Updated**: Notifies vendor of payment status change
-
-Example webhook payload (SPK Published):
-
-```json
-{
-  "spkNumber": "SPK-2026-001",
-  "vendorName": "PT Vendor Jaya",
-  "vendorEmail": "vendor@example.com",
-  "projectName": "Office Renovation",
-  "contractValue": 100000000,
-  "currency": "IDR"
-}
+```sql
+-- Dynamic payment support
+CREATE TABLE payment (
+  id UUID PRIMARY KEY,
+  spk_id UUID REFERENCES spk(id),
+  term_name VARCHAR(100), -- Not enum, fully flexible
+  term_order INTEGER, -- Sequence control
+  amount NUMERIC(15, 2),
+  percentage NUMERIC(5, 2), -- Optional
+  input_type VARCHAR(20), -- 'percentage' or 'nominal'
+  ...
+);
 ```
 
-## Customization
+## 🔌 API Routes
 
-### Update Currency Format
+- `GET /api/pdf/[id]`: Generate and download SPK PDF (supports shareable links)
 
-Edit `lib/utils.ts`:
+## ⚡ Server Actions
+
+- `createSPK`: Create new SPK with dynamic payments
+- `publishSPK`: Publish SPK, generate PDF, send notifications
+- `getSPKList`: Fetch all SPKs with filtering
+- `getSPKWithPayments`: Fetch SPK with all payment details
+- `updatePaymentStatus`: Update payment status and notify
+
+## 🔔 Integrations
+
+### Email Notifications (Resend)
 
 ```typescript
-export function formatCurrency(amount: number, currency: string = "IDR"): string {
-  return new Intl.NumberFormat("id-ID", {
+import { Resend } from "resend";
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+await resend.emails.send({
+  from: "noreply@company.com",
+  to: vendor.email,
+  subject: "New SPK Created",
+  html: emailTemplate,
+});
+```
+
+### Slack Notifications
+
+```typescript
+// Direct webhook integration
+await fetch(process.env.SLACK_WEBHOOK_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    text: `🎉 New SPK #${spk.spk_number} published for ${spk.vendor_name}`,
+    blocks: [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*New SPK Created*\nSPK: ${spk.spk_number}\nVendor: ${spk.vendor_name}\nProject: ${spk.project_name}\nValue: ${formatCurrency(spk.contract_value, spk.currency)}`,
+        },
+      },
+    ],
+  }),
+});
+```
+
+**Events:**
+
+- ✅ SPK Published (automatic)
+- ✅ Payment Status Updated (automatic)
+
+## 🎨 Customization
+
+### Currency Support
+
+Add more currencies in `lib/utils.ts`:
+
+```typescript
+const currencyFormats: Record<string, { locale: string; currency: string }> = {
+  IDR: { locale: "id-ID", currency: "IDR" },
+  USD: { locale: "en-US", currency: "USD" },
+  SGD: { locale: "en-SG", currency: "SGD" },
+  EUR: { locale: "de-DE", currency: "EUR" },
+  // Add more as needed
+};
+
+export function formatCurrency(
+  amount: number,
+  currency: string = "IDR",
+): string {
+  const format = currencyFormats[currency] || currencyFormats.IDR;
+  return new Intl.NumberFormat(format.locale, {
     style: "currency",
-    currency: currency,
+    currency: format.currency,
   }).format(amount);
 }
 ```
 
 ### Modify PDF Template
 
-Edit `lib/pdf/spk-template.tsx` to customize the PDF layout and styling.
+Edit `lib/pdf/spk-template.tsx` to customize the PDF layout. The template supports dynamic payment terms:
 
-### Add Authentication
+```typescript
+// Dynamic payment rendering
+{payments.map((payment, index) => (
+  <View key={payment.id}>
+    <Text>{payment.term_name}</Text>
+    <Text>{formatCurrency(payment.amount, spk.currency)}</Text>
+  </View>
+))}
+```
+
+### Authentication
 
 Currently uses basic token-based access. To add proper authentication:
 
-1. Set up Supabase Auth
-2. Update RLS policies in `database/schema.sql`
-3. Add auth middleware to protected routes
+1. Set up Supabase Auth (already configured)
+2. Add sign-in/sign-up pages
+3. Update RLS policies in `database/schema.sql`
+4. Add auth middleware to protected routes
 
-## Deployment
+## 🚢 Deployment
 
 ### Vercel (Recommended)
 
 1. Push code to GitHub
 2. Import project in Vercel
-3. Add environment variables
+3. Add environment variables:
+   - Supabase credentials
+   - Resend API key
+   - Slack webhook URL
 4. Deploy
 
 ### Other Platforms
@@ -233,11 +333,13 @@ Currently uses basic token-based access. To add proper authentication:
 - AWS Amplify
 
 Ensure platform supports:
+
 - Next.js 14 App Router
 - Server-side rendering
+- Server Actions
 - Environment variables
 
-## Troubleshooting
+## 🔧 Troubleshooting
 
 ### "Missing Supabase environment variables"
 
@@ -251,31 +353,88 @@ Check that `@react-pdf/renderer` is properly installed:
 npm install @react-pdf/renderer
 ```
 
-### Disk space error during npm install
+### Email not sending
 
-Clear npm cache:
+Verify Resend API key is correct:
 
 ```bash
-npm cache clean --force
-npm install
+# Test in terminal
+curl -X POST 'https://api.resend.com/emails' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json'
 ```
 
-## Contributing
+### Slack notifications not working
 
-This is a proof of concept project. For production use:
+1. Verify webhook URL is correct
+2. Test webhook manually:
 
-- Add proper authentication
-- Implement proper error handling
-- Add input validation with Zod schemas
-- Add unit and integration tests
-- Implement audit logging
-- Add file upload for attachments
-- Enhance security (CSRF protection, rate limiting)
+```bash
+curl -X POST YOUR_SLACK_WEBHOOK_URL \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Test notification"}'
+```
 
-## License
+## 📚 Documentation
+
+- [PRD.md](./PRD.md) - Complete Product Requirements Document
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - System Architecture Overview
+- [SPECIFICATION_UPDATES.md](./SPECIFICATION_UPDATES.md) - Latest specification changes
+- [database/schema.sql](./database/schema.sql) - Database schema with comments
+
+## 🎯 Roadmap
+
+### Phase 1 (Current - PoC) ✅
+
+- Dynamic SPK creation with flexible payment terms
+- Multi-currency support
+- PDF generation and sharing
+- Direct email and Slack integration
+
+### Phase 2 (Planned)
+
+- Approval workflows
+- File attachments for supporting documents
+- Payment reminders
+- Advanced reporting dashboard
+- Audit trail
+
+### Phase 3 (Future)
+
+- Digital signatures
+- Mobile app
+- Multi-language support
+- Batch operations
+- Advanced analytics
+
+## 🤝 Contributing
+
+This is a proof of concept project. For production use, consider:
+
+- ✅ Proper authentication with session management
+- ✅ Comprehensive error handling
+- ✅ Input validation with Zod schemas (already partially implemented)
+- ✅ Unit and integration tests
+- ✅ Audit logging for all actions
+- ✅ File upload for payment proofs and attachments
+- ✅ Enhanced security (CSRF protection, rate limiting)
+- ✅ Database migrations strategy
+- ✅ API documentation
+
+## 📄 License
 
 MIT
 
-## Support
+## 💬 Support
 
-For issues or questions, please open an issue in the GitHub repository.
+For issues or questions:
+
+- Open an issue in the GitHub repository
+- Check [SPECIFICATION_UPDATES.md](./SPECIFICATION_UPDATES.md) for recent changes
+- Review [PRD.md](./PRD.md) for detailed specifications
+
+---
+
+**Version:** 1.0  
+**Last Updated:** February 3, 2026  
+**Status:** Active Development

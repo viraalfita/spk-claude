@@ -1,0 +1,425 @@
+"use client";
+
+import { createSPK } from "@/app/actions/spk";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { CreateSPKFormData, CURRENCY_OPTIONS, PaymentTerm } from "@/lib/types";
+import {
+  calculatePaymentAmount,
+  formatCurrency,
+  validatePaymentPercentages,
+} from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+export function SPKCreateForm() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+
+  const [formData, setFormData] = useState<CreateSPKFormData>({
+    spkNumber: "",
+    vendorName: "",
+    vendorEmail: "",
+    vendorPhone: "",
+    projectName: "",
+    projectDescription: "",
+    contractValue: 0,
+    currency: "IDR",
+    startDate: "",
+    endDate: "",
+    paymentTerms: [
+      {
+        term_name: "Down Payment",
+        term_order: 1,
+        amount: 0,
+        percentage: 30,
+        input_type: "percentage",
+        due_date: "",
+      },
+    ],
+    notes: "",
+  });
+
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === "contractValue" ? parseFloat(value) || 0 : value,
+    }));
+  };
+
+  const handlePaymentTermChange = (
+    index: number,
+    field: keyof PaymentTerm,
+    value: string | number
+  ) => {
+    const newPaymentTerms = [...formData.paymentTerms];
+    const term = { ...newPaymentTerms[index] };
+
+    if (field === "input_type") {
+      term.input_type = value as "percentage" | "amount";
+      if (value === "percentage") {
+        term.percentage = 0;
+        term.amount = 0;
+      } else {
+        term.percentage = undefined;
+        term.amount = 0;
+      }
+    } else if (field === "percentage") {
+      term.percentage = parseFloat(value as string) || 0;
+      term.amount = calculatePaymentAmount(
+        formData.contractValue,
+        term.percentage
+      );
+    } else if (field === "amount") {
+      term.amount = parseFloat(value as string) || 0;
+      term.percentage = undefined;
+    } else {
+      (term as any)[field] = value;
+    }
+
+    newPaymentTerms[index] = term;
+    setFormData((prev) => ({ ...prev, paymentTerms: newPaymentTerms }));
+  };
+
+  const addPaymentTerm = () => {
+    const newOrder = formData.paymentTerms.length + 1;
+    setFormData((prev) => ({
+      ...prev,
+      paymentTerms: [
+        ...prev.paymentTerms,
+        {
+          term_name: `Payment Term ${newOrder}`,
+          term_order: newOrder,
+          amount: 0,
+          percentage: 0,
+          input_type: "percentage",
+          due_date: "",
+        },
+      ],
+    }));
+  };
+
+  const removePaymentTerm = (index: number) => {
+    if (formData.paymentTerms.length === 1) {
+      alert("At least one payment term is required");
+      return;
+    }
+
+    const newPaymentTerms = formData.paymentTerms
+      .filter((_, i) => i !== index)
+      .map((term, i) => ({ ...term, term_order: i + 1 }));
+
+    setFormData((prev) => ({ ...prev, paymentTerms: newPaymentTerms }));
+  };
+
+  const validateStep = (step: number): boolean => {
+    switch (step) {
+      case 1:
+        if (!formData.vendorName.trim()) {
+          alert("Vendor name is required");
+          return false;
+        }
+        return true;
+      case 2:
+        if (!formData.projectName.trim()) {
+          alert("Project name is required");
+          return false;
+        }
+        if (formData.contractValue <= 0) {
+          alert("Contract value must be greater than 0");
+          return false;
+        }
+        if (!formData.startDate) {
+          alert("Start date is required");
+          return false;
+        }
+        return true;
+      case 3:
+        const validation = validatePaymentPercentages(formData.paymentTerms);
+        if (!validation.valid) {
+          alert(
+            `Invalid payment terms. Total: ${validation.total}%. Must not exceed 100%`
+          );
+          return false;
+        }
+        return true;
+      default:
+        return true;
+    }
+  };
+
+  const nextStep = () => {
+    if (validateStep(currentStep)) {
+      setCurrentStep((prev) => Math.min(prev + 1, 4));
+    }
+  };
+
+  const prevStep = () => {
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateStep(3)) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+
+      const result = await createSPK(formData);
+
+      if (result.success) {
+        alert("SPK created successfully!");
+        router.push("/dashboard");
+      } else {
+        alert(result.error || "Failed to create SPK");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("An error occurred while creating SPK");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getTotalPaymentAmount = () => {
+    return formData.paymentTerms.reduce((sum, term) => sum + term.amount, 0);
+  };
+
+  const getTotalPercentage = () => {
+    return formData.paymentTerms.reduce(
+      (sum, term) => sum + (term.percentage || 0),
+      0
+    );
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Vendor Information */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Vendor Information</h3>
+
+        <div>
+          <Label htmlFor="vendorName">Vendor Name *</Label>
+          <Input
+            id="vendorName"
+            name="vendorName"
+            value={formData.vendorName}
+            onChange={handleChange}
+            required
+            placeholder="PT Vendor Jaya"
+          />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <Label htmlFor="vendorEmail">Vendor Email</Label>
+            <Input
+              id="vendorEmail"
+              name="vendorEmail"
+              type="email"
+              value={formData.vendorEmail}
+              onChange={handleChange}
+              placeholder="vendor@example.com"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="vendorPhone">Vendor Phone</Label>
+            <Input
+              id="vendorPhone"
+              name="vendorPhone"
+              value={formData.vendorPhone}
+              onChange={handleChange}
+              placeholder="+62-812-3456-7890"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Project Information */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Project Information</h3>
+
+        <div>
+          <Label htmlFor="projectName">Project Name *</Label>
+          <Input
+            id="projectName"
+            name="projectName"
+            value={formData.projectName}
+            onChange={handleChange}
+            required
+            placeholder="Office Renovation Phase 1"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="projectDescription">Project Description</Label>
+          <Textarea
+            id="projectDescription"
+            name="projectDescription"
+            value={formData.projectDescription}
+            onChange={handleChange}
+            placeholder="Detailed project description..."
+            rows={4}
+          />
+        </div>
+      </div>
+
+      {/* Contract Details */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Contract Details</h3>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <Label htmlFor="contractValue">Contract Value *</Label>
+            <Input
+              id="contractValue"
+              name="contractValue"
+              type="number"
+              value={formData.contractValue}
+              onChange={handleChange}
+              required
+              min="0"
+              placeholder="100000000"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="currency">Currency</Label>
+            <Input
+              id="currency"
+              name="currency"
+              value={formData.currency}
+              onChange={handleChange}
+              placeholder="IDR"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <Label htmlFor="startDate">Start Date *</Label>
+            <Input
+              id="startDate"
+              name="startDate"
+              type="date"
+              value={formData.startDate}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="endDate">End Date</Label>
+            <Input
+              id="endDate"
+              name="endDate"
+              type="date"
+              value={formData.endDate}
+              onChange={handleChange}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Payment Terms */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Payment Terms</h3>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <Label htmlFor="dpPercentage">Down Payment (%)</Label>
+            <Input
+              id="dpPercentage"
+              name="dpPercentage"
+              type="number"
+              value={formData.dpPercentage}
+              onChange={handleChange}
+              min="0"
+              max="100"
+            />
+            <p className="mt-1 text-sm text-gray-500">
+              Amount: Rp {dpAmount.toLocaleString("id-ID")}
+            </p>
+          </div>
+
+          <div>
+            <Label htmlFor="progressPercentage">Progress Payment (%)</Label>
+            <Input
+              id="progressPercentage"
+              name="progressPercentage"
+              type="number"
+              value={formData.progressPercentage}
+              onChange={handleChange}
+              min="0"
+              max="100"
+            />
+            <p className="mt-1 text-sm text-gray-500">
+              Amount: Rp {progressAmount.toLocaleString("id-ID")}
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <Label>Final Payment</Label>
+          <Input
+            value={`${finalPercentage}%`}
+            disabled
+            className="bg-gray-50"
+          />
+          <p className="mt-1 text-sm text-gray-500">
+            Amount: Rp {finalAmount.toLocaleString("id-ID")}
+          </p>
+        </div>
+
+        {finalPercentage < 0 && (
+          <p className="text-sm text-red-600">
+            Warning: Payment percentages exceed 100%
+          </p>
+        )}
+      </div>
+
+      {/* Notes */}
+      <div>
+        <Label htmlFor="notes">Additional Notes</Label>
+        <Textarea
+          id="notes"
+          name="notes"
+          value={formData.notes}
+          onChange={handleChange}
+          placeholder="Any special instructions or notes..."
+          rows={3}
+        />
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-4">
+        <Button type="submit" disabled={loading} className="flex-1">
+          {loading ? "Creating..." : "Create SPK (Draft)"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.push("/dashboard")}
+          disabled={loading}
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+}

@@ -1,5 +1,11 @@
 import { SPKCreateForm } from "@/components/spk-create-form";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -16,10 +22,11 @@ export default function CreateSPKPage() {
         </Link>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="text-center">
             <CardTitle>Create New SPK</CardTitle>
             <CardDescription>
-              Fill in the details below to create a new work order (SPK) for a vendor
+              Fill in the details below to create a new work order (SPK) for a
+              vendor
             </CardDescription>
           </CardHeader>
           <CardContent>

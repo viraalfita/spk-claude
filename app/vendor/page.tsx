@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { PAYMENT_TERM_LABELS, STATUS_COLORS } from "@/lib/types";
+import { STATUS_COLORS } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { Download, FileText } from "lucide-react";
 import Link from "next/link";
@@ -191,14 +191,11 @@ export default async function VendorDashboardPage({
                         >
                           <div>
                             <p className="font-medium text-sm">
-                              {
-                                PAYMENT_TERM_LABELS[
-                                  payment.term as keyof typeof PAYMENT_TERM_LABELS
-                                ]
-                              }
+                              {payment.term_name}
                             </p>
                             <p className="text-xs text-gray-500">
-                              {payment.percentage}% -{" "}
+                              {payment.percentage !== null &&
+                                `${payment.percentage}% - `}
                               {formatCurrency(payment.amount, spk.currency)}
                             </p>
                             {payment.paid_date && (
