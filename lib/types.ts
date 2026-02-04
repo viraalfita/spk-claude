@@ -63,6 +63,8 @@ export interface CreateSPKFormData {
   vendorName: string;
   vendorEmail?: string;
   vendorPhone?: string;
+  picName?: string;
+  picEmail?: string;
   projectName: string;
   projectDescription?: string;
   contractValue: number;

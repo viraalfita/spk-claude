@@ -100,7 +100,7 @@ export function SPKPDFTemplate({ spk }: SPKPDFTemplateProps) {
           <Text style={styles.title}>SURAT PERINTAH KERJA (SPK)</Text>
           <Text style={styles.subtitle}>Work Order Document</Text>
           <View style={{ marginTop: 10 }}>
-            <Text>No: {spk.spk_number}</Text>
+            <Text>No. {spk.spk_number}</Text>
             <Text>Date: {formatDate(spk.created_at)}</Text>
           </View>
         </View>
@@ -177,7 +177,9 @@ export function SPKPDFTemplate({ spk }: SPKPDFTemplateProps) {
                 <Text style={styles.tableCol}>
                   {payment.term_name}
                 </Text>
-                <Text style={styles.tableCol}>{payment.percentage}%</Text>
+                <Text style={styles.tableCol}>
+                  {payment.percentage != null ? `${payment.percentage}%` : "-"}
+                </Text>
                 <Text style={styles.tableCol}>
                   {formatCurrency(payment.amount, spk.currency)}
                 </Text>
@@ -186,6 +188,18 @@ export function SPKPDFTemplate({ spk }: SPKPDFTemplateProps) {
                 </Text>
               </View>
             ))}
+            {/* Total Row */}
+            <View style={[styles.tableRow, { borderTop: "2pt solid #333", borderBottom: "none" }]}>
+              <Text style={[styles.tableCol, { fontWeight: "bold" }]}>Total</Text>
+              <Text style={styles.tableCol}></Text>
+              <Text style={[styles.tableCol, { fontWeight: "bold" }]}>
+                {formatCurrency(
+                  spk.payments.reduce((sum, p) => sum + p.amount, 0),
+                  spk.currency,
+                )}
+              </Text>
+              <Text style={styles.tableCol}></Text>
+            </View>
           </View>
         </View>
 

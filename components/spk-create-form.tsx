@@ -1,6 +1,7 @@
 "use client";
 
 import { createSPK, publishSPK } from "@/app/actions/spk";
+import { getProjectHistory } from "@/app/actions/project";
 import { getVendorHistory } from "@/app/actions/vendor";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ProjectAutocomplete } from "@/components/project-autocomplete";
 import { VendorAutocomplete } from "@/components/vendor-autocomplete";
 import { CreateSPKFormData, CURRENCIES, PaymentTerm } from "@/lib/types";
 import {
@@ -26,6 +28,7 @@ export function SPKCreateForm() {
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [vendorHistory, setVendorHistory] = useState<any[]>([]);
+  const [projectHistory, setProjectHistory] = useState<any[]>([]);
   const [createdSPK, setCreatedSPK] = useState<any>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -33,12 +36,15 @@ export function SPKCreateForm() {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [currencySelection, setCurrencySelection] = useState<string>("IDR");
   const [customCurrency, setCustomCurrency] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState<CreateSPKFormData>({
     spkNumber: "",
     vendorName: "",
     vendorEmail: "",
     vendorPhone: "",
+    picName: "",
+    picEmail: "",
     projectName: "",
     projectDescription: "",
     contractValue: 0,
@@ -59,14 +65,19 @@ export function SPKCreateForm() {
   });
 
   useEffect(() => {
-    // Fetch vendor history on component mount
-    async function loadVendorHistory() {
-      const result = await getVendorHistory();
-      if (result.success && result.data) {
-        setVendorHistory(result.data);
+    async function loadHistory() {
+      const [vendorResult, projectResult] = await Promise.all([
+        getVendorHistory(),
+        getProjectHistory(),
+      ]);
+      if (vendorResult.success && vendorResult.data) {
+        setVendorHistory(vendorResult.data);
+      }
+      if (projectResult.success && projectResult.data) {
+        setProjectHistory(projectResult.data);
       }
     }
-    loadVendorHistory();
+    loadHistory();
   }, []);
 
   useEffect(() => {
@@ -97,6 +108,16 @@ export function SPKCreateForm() {
       vendorEmail: vendor.vendor_email || "",
       vendorPhone: vendor.vendor_phone || "",
     }));
+    setFieldErrors((prev) => ({ ...prev, vendorName: "" }));
+  };
+
+  const handleProjectSelect = (project: any) => {
+    setFormData((prev) => ({
+      ...prev,
+      projectName: project.project_name,
+      projectDescription: project.project_description || "",
+    }));
+    setFieldErrors((prev) => ({ ...prev, projectName: "" }));
   };
 
   const handlePaymentTermChange = (
@@ -169,72 +190,82 @@ export function SPKCreateForm() {
   };
 
   const validateStep = (step: number): boolean => {
+    const errors: Record<string, string> = {};
+
     switch (step) {
       case 1:
         if (!formData.vendorName.trim()) {
-          toast({
-            title: "Vendor name required",
-            description: "Please enter a vendor name.",
-            variant: "destructive",
-          });
-          return false;
+          errors.vendorName = "Vendor name is required.";
         }
-        return true;
+        if (!formData.vendorPhone?.trim()) {
+          errors.vendorPhone = "Vendor phone is required.";
+        }
+        if (!formData.vendorEmail?.trim()) {
+          errors.vendorEmail = "Vendor email is required.";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.vendorEmail)) {
+          errors.vendorEmail = "Please enter a valid email address.";
+        }
+        break;
       case 2:
         if (!formData.projectName.trim()) {
-          toast({
-            title: "Project name required",
-            description: "Please enter a project name.",
-            variant: "destructive",
-          });
-          return false;
+          errors.projectName = "Project name is required.";
         }
         if (formData.contractValue <= 0) {
-          toast({
-            title: "Invalid contract value",
-            description: "Contract value must be greater than 0.",
-            variant: "destructive",
-          });
-          return false;
+          errors.contractValue = "Contract value must be greater than 0.";
         }
         if (currencySelection === "etc" && !customCurrency.trim()) {
-          toast({
-            title: "Custom currency required",
-            description: "Please provide a currency code.",
-            variant: "destructive",
-          });
-          return false;
+          errors.customCurrency = "Please provide a currency code.";
         }
         if (!formData.startDate) {
-          toast({
-            title: "Start date required",
-            description: "Please select a start date.",
-            variant: "destructive",
-          });
-          return false;
+          errors.startDate = "Start date is required.";
         }
-        return true;
-      case 3:
+        if (!formData.endDate) {
+          errors.endDate = "End date is required.";
+        }
+        break;
+      case 3: {
         const validation = validatePaymentPercentages(
           formData.paymentTerms.map((t) => t.percentage),
         );
         if (!validation.valid) {
+          errors.paymentPercentage = `Total percentage is ${validation.total}%. Must not exceed 100%.`;
           toast({
             title: "Invalid payment terms",
-            description: `Total percentage is ${validation.total}%. Must not exceed 100%.`,
+            description: errors.paymentPercentage,
             variant: "destructive",
           });
-          return false;
         }
-        return true;
+        break;
+      }
+      case 4:
+        if (!formData.picName?.trim()) {
+          errors.picName = "PIC name is required.";
+        }
+        if (!formData.picEmail?.trim()) {
+          errors.picEmail = "PIC email is required.";
+        }
+        break;
       default:
-        return true;
+        break;
     }
+
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      const firstError = Object.values(errors)[0];
+      toast({
+        title: "Validation error",
+        description: firstError,
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
   };
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep((prev) => Math.min(prev + 1, 4));
+      setCurrentStep((prev) => Math.min(prev + 1, 5));
     }
   };
 
@@ -245,24 +276,18 @@ export function SPKCreateForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateStep(3)) {
+    if (!validateStep(4)) {
       return;
     }
 
     setLoading(true);
 
     try {
-      // Clean up formData - remove empty spkNumber to trigger auto-generation
-      const submitData = {
-        ...formData,
-        spkNumber: formData.spkNumber?.trim() || undefined,
-      };
-
-      const result = await createSPK(submitData);
+      const result = await createSPK(formData);
 
       if (result.success) {
         setCreatedSPK(result.data);
-        setCurrentStep(4);
+        setCurrentStep(5);
       } else {
         toast({
           title: "Failed to create SPK",
@@ -296,10 +321,10 @@ export function SPKCreateForm() {
   return (
     <div className="space-y-6">
       {/* Step Indicator */}
-      {currentStep < 5 && (
+      {currentStep < 6 && (
         <div className="mb-8">
           <div className="flex items-center justify-between px-4 md:px-12">
-            {[1, 2, 3, 4].map((step) => (
+            {[1, 2, 3, 4, 5].map((step) => (
               <div key={step} className="flex items-center flex-1 last:flex-none">
                 <div className="flex flex-col items-center">
                   <div
@@ -312,10 +337,18 @@ export function SPKCreateForm() {
                     {step}
                   </div>
                   <span className={`text-xs mt-1 ${currentStep >= step ? "text-blue-600 font-medium" : "text-gray-500"}`}>
-                    {step === 1 ? "Vendor" : step === 2 ? "Project" : step === 3 ? "Payment" : "Review"}
+                    {step === 1
+                      ? "Vendor"
+                      : step === 2
+                        ? "Project"
+                        : step === 3
+                          ? "Payment"
+                          : step === 4
+                            ? "PIC"
+                            : "Review"}
                   </span>
                 </div>
-                {step < 4 && (
+                {step < 5 && (
                   <div
                     className={`flex-1 h-1 mx-3 ${
                       currentStep > step ? "bg-blue-600" : "bg-gray-200"
@@ -340,30 +373,47 @@ export function SPKCreateForm() {
                 onChange={handleVendorSelect}
                 vendors={vendorHistory}
               />
+              {fieldErrors.vendorName && (
+                <p className="text-sm text-red-600 mt-1">{fieldErrors.vendorName}</p>
+              )}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <Label htmlFor="vendorEmail">Vendor Email</Label>
+                <Label htmlFor="vendorEmail">Vendor Email *</Label>
                 <Input
                   id="vendorEmail"
                   name="vendorEmail"
                   type="email"
                   value={formData.vendorEmail}
-                  onChange={handleChange}
+                  onChange={(e) => {
+                    handleChange(e);
+                    setFieldErrors((prev) => ({ ...prev, vendorEmail: "" }));
+                  }}
                   placeholder="vendor@example.com"
+                  required
                 />
+                {fieldErrors.vendorEmail && (
+                  <p className="text-sm text-red-600 mt-1">{fieldErrors.vendorEmail}</p>
+                )}
               </div>
 
               <div>
-                <Label htmlFor="vendorPhone">Vendor Phone</Label>
+                <Label htmlFor="vendorPhone">Vendor Phone *</Label>
                 <Input
                   id="vendorPhone"
                   name="vendorPhone"
                   value={formData.vendorPhone}
-                  onChange={handleChange}
+                  onChange={(e) => {
+                    handleChange(e);
+                    setFieldErrors((prev) => ({ ...prev, vendorPhone: "" }));
+                  }}
                   placeholder="+62-812-3456-7890"
+                  required
                 />
+                {fieldErrors.vendorPhone && (
+                  <p className="text-sm text-red-600 mt-1">{fieldErrors.vendorPhone}</p>
+                )}
               </div>
             </div>
           </div>
@@ -382,21 +432,20 @@ export function SPKCreateForm() {
                   </svg>
                   <div>
                     <p className="text-sm font-medium text-blue-800">SPK Number</p>
-                    <p className="text-xs text-blue-600">Will be auto-generated upon submission</p>
+                    <p className="text-xs text-blue-600">Will be auto-generated as No. ELX/SPK/YYYYMMDD/###</p>
                   </div>
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="projectName">Project Name *</Label>
-                <Input
-                  id="projectName"
-                  name="projectName"
+                <ProjectAutocomplete
                   value={formData.projectName}
-                  onChange={handleChange}
-                  required
-                  placeholder="Office Renovation Phase 1"
+                  onChange={handleProjectSelect}
+                  projects={projectHistory}
                 />
+                {fieldErrors.projectName && (
+                  <p className="text-sm text-red-600 mt-1">{fieldErrors.projectName}</p>
+                )}
               </div>
 
               <div>
@@ -423,12 +472,18 @@ export function SPKCreateForm() {
                     name="contractValue"
                     type="number"
                     value={formData.contractValue}
-                    onChange={handleChange}
+                    onChange={(e) => {
+                      handleChange(e);
+                      setFieldErrors((prev) => ({ ...prev, contractValue: "" }));
+                    }}
                     required
                     min="0"
                     step="0.01"
                     placeholder="100000000"
                   />
+                  {fieldErrors.contractValue && (
+                    <p className="text-sm text-red-600 mt-1">{fieldErrors.contractValue}</p>
+                  )}
                 </div>
 
                 <div>
@@ -472,10 +527,14 @@ export function SPKCreateForm() {
                       const value = e.target.value;
                       setCustomCurrency(value);
                       setFormData((prev) => ({ ...prev, currency: value }));
+                      setFieldErrors((prev) => ({ ...prev, customCurrency: "" }));
                     }}
                     placeholder="e.g., AUD, JPY, GBP"
                     required
                   />
+                  {fieldErrors.customCurrency && (
+                    <p className="text-sm text-red-600 mt-1">{fieldErrors.customCurrency}</p>
+                  )}
                 </div>
               )}
 
@@ -487,20 +546,33 @@ export function SPKCreateForm() {
                     name="startDate"
                     type="date"
                     value={formData.startDate}
-                    onChange={handleChange}
+                    onChange={(e) => {
+                      handleChange(e);
+                      setFieldErrors((prev) => ({ ...prev, startDate: "" }));
+                    }}
                     required
                   />
+                  {fieldErrors.startDate && (
+                    <p className="text-sm text-red-600 mt-1">{fieldErrors.startDate}</p>
+                  )}
                 </div>
 
                 <div>
-                  <Label htmlFor="endDate">End Date</Label>
+                  <Label htmlFor="endDate">End Date *</Label>
                   <Input
                     id="endDate"
                     name="endDate"
                     type="date"
                     value={formData.endDate}
-                    onChange={handleChange}
+                    onChange={(e) => {
+                      handleChange(e);
+                      setFieldErrors((prev) => ({ ...prev, endDate: "" }));
+                    }}
+                    required
                   />
+                  {fieldErrors.endDate && (
+                    <p className="text-sm text-red-600 mt-1">{fieldErrors.endDate}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -734,8 +806,52 @@ export function SPKCreateForm() {
           </div>
         )}
 
-        {/* Step 4: Review & Additional Notes */}
+        {/* Step 4: PIC Information */}
         {currentStep === 4 && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">SPK PIC Information</h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="picName">PIC Name *</Label>
+                <Input
+                  id="picName"
+                  name="picName"
+                  value={formData.picName}
+                  onChange={(e) => {
+                    handleChange(e);
+                    setFieldErrors((prev) => ({ ...prev, picName: "" }));
+                  }}
+                  placeholder="PIC Name"
+                  required
+                />
+                {fieldErrors.picName && (
+                  <p className="text-sm text-red-600 mt-1">{fieldErrors.picName}</p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="picEmail">PIC Email *</Label>
+                <Input
+                  id="picEmail"
+                  name="picEmail"
+                  type="email"
+                  value={formData.picEmail}
+                  onChange={(e) => {
+                    handleChange(e);
+                    setFieldErrors((prev) => ({ ...prev, picEmail: "" }));
+                  }}
+                  placeholder="pic@company.com"
+                  required
+                />
+                {fieldErrors.picEmail && (
+                  <p className="text-sm text-red-600 mt-1">{fieldErrors.picEmail}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Review & Additional Notes */}
+        {currentStep === 5 && (
           <div className="space-y-6">
             <h3 className="text-lg font-semibold">Review & Summary</h3>
 
@@ -747,18 +863,14 @@ export function SPKCreateForm() {
                   <span className="text-gray-600">Name:</span>
                   <span className="col-span-2">{formData.vendorName}</span>
                 </div>
-                {formData.vendorEmail && (
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-gray-600">Email:</span>
-                    <span className="col-span-2">{formData.vendorEmail}</span>
-                  </div>
-                )}
-                {formData.vendorPhone && (
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-gray-600">Phone:</span>
-                    <span className="col-span-2">{formData.vendorPhone}</span>
-                  </div>
-                )}
+                <div className="grid grid-cols-3 gap-2">
+                  <span className="text-gray-600">Email:</span>
+                  <span className="col-span-2">{formData.vendorEmail}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <span className="text-gray-600">Phone:</span>
+                  <span className="col-span-2">{formData.vendorPhone}</span>
+                </div>
               </div>
             </Card>
 
@@ -768,7 +880,7 @@ export function SPKCreateForm() {
               <div className="space-y-1 text-sm">
                 <div className="grid grid-cols-3 gap-2">
                   <span className="text-gray-600">SPK Number:</span>
-                  <span className="col-span-2 text-blue-600 italic">Auto-generated upon submission</span>
+                  <span className="col-span-2 text-blue-600 italic">Auto-generated (No. ELX/SPK/YYYYMMDD/###)</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <span className="text-gray-600">Project:</span>
@@ -798,9 +910,26 @@ export function SPKCreateForm() {
                     {formData.startDate
                       ? formatDate(formData.startDate)
                       : "-"}
-                    {formData.endDate &&
-                      ` - ${formatDate(formData.endDate)}`}
+                    {" - "}
+                    {formData.endDate
+                      ? formatDate(formData.endDate)
+                      : "-"}
                   </span>
+                </div>
+              </div>
+            </Card>
+
+            {/* PIC Info Review */}
+            <Card className="p-4">
+              <h4 className="font-medium mb-3">SPK PIC</h4>
+              <div className="space-y-1 text-sm">
+                <div className="grid grid-cols-3 gap-2">
+                  <span className="text-gray-600">Name:</span>
+                  <span className="col-span-2">{formData.picName}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <span className="text-gray-600">Email:</span>
+                  <span className="col-span-2">{formData.picEmail}</span>
                 </div>
               </div>
             </Card>
@@ -1028,8 +1157,8 @@ export function SPKCreateForm() {
           </div>
         )}
 
-        {/* Navigation Buttons - Only show for steps 1-4 */}
-        {currentStep < 5 && (
+        {/* Navigation Buttons - Only show for steps 1-5 */}
+        {currentStep < 6 && (
           <div className="flex gap-4 pt-4 border-t">
             {currentStep > 1 && (
               <Button
@@ -1038,11 +1167,11 @@ export function SPKCreateForm() {
                 onClick={prevStep}
                 disabled={loading}
               >
-                {currentStep === 4 ? "Back" : "Previous"}
+                {currentStep === 5 ? "Back" : "Previous"}
               </Button>
             )}
 
-            {currentStep < 4 ? (
+            {currentStep < 5 ? (
               <Button
                 type="button"
                 onClick={nextStep}

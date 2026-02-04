@@ -4,7 +4,7 @@ import { sendSPKCreatedEmail } from "@/lib/email";
 import { notifySPKPublished } from "@/lib/slack";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { CreateSPKFormData, SPKWithPayments } from "@/lib/types";
-import { generateSPKNumber } from "@/lib/utils";
+import { generateSPKDatePrefix } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 
 // Helper to get user session (placeholder - implement based on your auth strategy)
@@ -23,25 +23,29 @@ export async function createSPK(data: CreateSPKFormData) {
   try {
     const session = await getUserSession();
 
-    // Generate SPK number if not provided or check uniqueness if provided
-    let spkNumber = data.spkNumber?.trim();
-    if (!spkNumber || spkNumber === "") {
-      spkNumber = generateSPKNumber();
-    } else {
-      // Check if SPK number already exists
-      const { data: existing } = await supabaseAdmin
-        .from("spk")
-        .select("id")
-        .eq("spk_number", spkNumber)
-        .single();
+    // Generate SPK number with format ELX/SPK/YYYYMMDD/###
+    const datePrefix = generateSPKDatePrefix();
 
-      if (existing) {
-        return {
-          success: false,
-          error: `SPK number ${spkNumber} already exists`,
-        };
+    // Query existing SPK numbers for today to determine next sequential number
+    const { data: existingNumbers } = await supabaseAdmin
+      .from("spk")
+      .select("spk_number")
+      .like("spk_number", `${datePrefix}/%`);
+
+    let nextIncrement = 1;
+    if (existingNumbers && existingNumbers.length > 0) {
+      const increments = existingNumbers
+        .map((row) => {
+          const parts = row.spk_number.split("/");
+          return parseInt(parts[parts.length - 1], 10);
+        })
+        .filter((n) => !isNaN(n));
+      if (increments.length > 0) {
+        nextIncrement = Math.max(...increments) + 1;
       }
     }
+
+    const spkNumber = `${datePrefix}/${nextIncrement.toString().padStart(3, "0")}`;
 
     // Create SPK record (without hardcoded payment fields)
     const { data: spk, error: spkError } = await supabaseAdmin
@@ -58,8 +62,8 @@ export async function createSPK(data: CreateSPKFormData) {
         start_date: data.startDate,
         end_date: data.endDate || null,
         status: "draft",
-        created_by: session.user.name,
-        created_by_email: session.user.email,
+        created_by: data.picName?.trim() || session.user.name,
+        created_by_email: data.picEmail?.trim() || session.user.email,
         notes: data.notes || null,
       })
       .select()

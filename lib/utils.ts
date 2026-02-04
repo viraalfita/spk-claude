@@ -21,16 +21,34 @@ export function formatCurrency(
   amount: number,
   currency: string = "IDR",
 ): string {
-  const format = currencyFormats[currency] || currencyFormats.IDR;
+  const format = currencyFormats[currency];
   const IntlConstructor =
     typeof window !== "undefined" && window.Intl ? window.Intl : global.Intl;
 
-  return new IntlConstructor.NumberFormat(format.locale, {
-    style: "currency",
-    currency: format.currency,
-    minimumFractionDigits: format.decimals ?? 0,
-    maximumFractionDigits: format.decimals ?? 0,
-  }).format(amount);
+  if (format) {
+    return new IntlConstructor.NumberFormat(format.locale, {
+      style: "currency",
+      currency: format.currency,
+      minimumFractionDigits: format.decimals ?? 0,
+      maximumFractionDigits: format.decimals ?? 0,
+    }).format(amount);
+  }
+
+  // For unknown/custom currencies, use the actual currency code with generic formatting
+  try {
+    return new IntlConstructor.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    // If the currency code is not valid for Intl, format manually
+    return `${currency} ${new IntlConstructor.NumberFormat("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount)}`;
+  }
 }
 
 export function formatDate(date: string | Date): string {
@@ -43,12 +61,14 @@ export function formatDate(date: string | Date): string {
   }).format(new Date(date));
 }
 
-// Generate SPK number with year and sequential number
-// Note: For production use, this should query the database to get the last number
-export function generateSPKNumber(): string {
-  const year = new Date().getFullYear();
-  const random = Math.floor(Math.random() * 900) + 100;
-  return `SPK-${year}-${random.toString().padStart(3, "0")}`;
+// Generate SPK date prefix for the format ELX/SPK/YYYYMMDD/###
+// The full number is generated server-side with sequential increment from the database
+export function generateSPKDatePrefix(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = (now.getMonth() + 1).toString().padStart(2, "0");
+  const day = now.getDate().toString().padStart(2, "0");
+  return `ELX/SPK/${year}${month}${day}`;
 }
 
 // Calculate payment amount based on percentage
