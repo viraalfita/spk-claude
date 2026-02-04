@@ -230,12 +230,12 @@ export function SPKCreateForm() {
         );
         if (!validation.valid) {
           errors.paymentPercentage = `Total percentage is ${validation.total}%. Must not exceed 100%.`;
-          toast({
-            title: "Invalid payment terms",
-            description: errors.paymentPercentage,
-            variant: "destructive",
-          });
         }
+        formData.paymentTerms.forEach((term, index) => {
+          if (!term.due_date) {
+            errors[`due_date_${index}`] = "Due date is required.";
+          }
+        });
         break;
       }
       case 4:
@@ -723,15 +723,19 @@ export function SPKCreateForm() {
                           id={`term-due-date-${index}`}
                           type="date"
                           value={term.due_date}
-                          onChange={(e) =>
+                          onChange={(e) => {
                             handlePaymentTermChange(
                               index,
                               "due_date",
                               e.target.value,
-                            )
-                          }
+                            );
+                            setFieldErrors((prev) => ({ ...prev, [`due_date_${index}`]: "" }));
+                          }}
                           required
                         />
+                        {fieldErrors[`due_date_${index}`] && (
+                          <p className="text-sm text-red-600 mt-1">{fieldErrors[`due_date_${index}`]}</p>
+                        )}
                       </div>
                     </div>
 
