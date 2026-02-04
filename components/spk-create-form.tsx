@@ -37,6 +37,7 @@ export function SPKCreateForm() {
   const [currencySelection, setCurrencySelection] = useState<string>("IDR");
   const [customCurrency, setCustomCurrency] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [vendorToken, setVendorToken] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<CreateSPKFormData>({
     spkNumber: "",
@@ -287,6 +288,9 @@ export function SPKCreateForm() {
 
       if (result.success) {
         setCreatedSPK(result.data);
+        if (result.vendorToken) {
+          setVendorToken(result.vendorToken);
+        }
         setCurrentStep(5);
       } else {
         toast({
@@ -1095,10 +1099,11 @@ export function SPKCreateForm() {
                       type="button"
                       variant="outline"
                       onClick={() => setShowShareMenu(!showShareMenu)}
+                      disabled={!vendorToken}
                     >
                       Share Link
                     </Button>
-                    {showShareMenu && (
+                    {showShareMenu && vendorToken && (
                       <div className="absolute top-full mt-2 w-64 bg-white border rounded-lg shadow-lg p-3 z-10">
                         <p className="text-xs text-gray-600 mb-2">
                           Share this link with vendor
@@ -1106,7 +1111,7 @@ export function SPKCreateForm() {
                         <div className="flex gap-2">
                           <input
                             type="text"
-                            value={`${window.location.origin}/vendor?spkId=${createdSPK.id}`}
+                            value={`${window.location.origin}/vendor?token=${vendorToken}`}
                             readOnly
                             className="flex-1 px-3 py-2 border rounded text-sm"
                           />
@@ -1114,11 +1119,11 @@ export function SPKCreateForm() {
                             size="sm"
                             onClick={() => {
                               navigator.clipboard.writeText(
-                                `${window.location.origin}/vendor?spkId=${createdSPK.id}`,
+                                `${window.location.origin}/vendor?token=${vendorToken}`,
                               );
                               toast({
                                 title: "Link copied",
-                                description: "Share link copied to clipboard.",
+                                description: "Vendor dashboard link copied to clipboard.",
                               });
                             }}
                           >

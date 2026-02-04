@@ -5,6 +5,7 @@ import { notifySPKPublished } from "@/lib/slack";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { CreateSPKFormData, SPKWithPayments } from "@/lib/types";
 import { generateSPKDatePrefix } from "@/lib/utils";
+import { getOrCreateVendorToken } from "@/app/actions/vendor";
 import { revalidatePath } from "next/cache";
 
 // Helper to get user session (placeholder - implement based on your auth strategy)
@@ -90,8 +91,21 @@ export async function createSPK(data: CreateSPKFormData) {
 
     if (paymentError) throw paymentError;
 
+    // Create or find vendor record and get share token
+    let vendorToken: string | undefined;
+    if (data.vendorEmail) {
+      const tokenResult = await getOrCreateVendorToken(
+        data.vendorEmail,
+        data.vendorName,
+        data.vendorPhone,
+      );
+      if (tokenResult.success) {
+        vendorToken = tokenResult.token;
+      }
+    }
+
     revalidatePath("/dashboard");
-    return { success: true, data: spk };
+    return { success: true, data: spk, vendorToken };
   } catch (error) {
     console.error("Error creating SPK:", error);
     return { success: false, error: "Failed to create SPK" };
