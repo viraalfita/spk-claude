@@ -1,7 +1,7 @@
 "use server";
 
 import { sendSPKCreatedEmail } from "@/lib/email";
-import { notifySPKPublished } from "@/lib/slack";
+import { generateSPKPDFBuffer } from "@/lib/pdf/generate-buffer";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { CreateSPKFormData, SPKWithPayments } from "@/lib/types";
 import { generateSPKDatePrefix } from "@/lib/utils";
@@ -124,25 +124,41 @@ export async function publishSPK(spkId: string, sendEmail: boolean = false) {
 
     if (error) throw error;
 
-    // Generate PDF URL for sharing
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const pdfUrl = `${baseUrl}/api/pdf/${spkId}`;
 
-    // Send Slack notification (automatic)
-    await notifySPKPublished(spk);
-
-    // Send email notification (optional, user-triggered)
+    // Send email notification with PDF attachment (optional, user-triggered)
     if (sendEmail && spk.vendor_email) {
-      await sendSPKCreatedEmail({
-        to: spk.vendor_email,
-        spk,
-        pdfUrl,
-      });
+      // Get SPK with payments for PDF generation
+      const spkWithPayments = await getSPKWithPayments(spkId);
+
+      if (spkWithPayments.success && spkWithPayments.data) {
+        // Generate PDF buffer for attachment
+        const pdfBuffer = await generateSPKPDFBuffer(spkWithPayments.data);
+
+        // Get or create vendor token for dashboard link
+        const tokenResult = await getOrCreateVendorToken(
+          spk.vendor_email,
+          spk.vendor_name,
+          spk.vendor_phone
+        );
+
+        const vendorDashboardUrl = tokenResult.success && tokenResult.token
+          ? `${baseUrl}/vendor?token=${tokenResult.token}`
+          : undefined;
+
+        // Send email with PDF attachment and vendor dashboard link
+        await sendSPKCreatedEmail({
+          to: spk.vendor_email,
+          spk,
+          pdfBuffer,
+          vendorDashboardUrl,
+        });
+      }
     }
 
     revalidatePath("/dashboard");
     revalidatePath(`/dashboard/spk/${spkId}`);
-    return { success: true, data: spk, pdfUrl };
+    return { success: true, data: spk };
   } catch (error) {
     console.error("Error publishing SPK:", error);
     return { success: false, error: "Failed to publish SPK" };
