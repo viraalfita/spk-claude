@@ -1,9 +1,7 @@
-import { getSPKWithPayments } from "@/app/actions/spk";
+import { getSPKWithPayments, publishSPK } from "@/app/actions/spk";
+import { getOrCreateVendorToken } from "@/app/actions/vendor";
 import { PaymentStatusUpdate } from "@/components/payment-status-update";
-import { PDFPreviewButton } from "@/components/pdf-preview-button";
-import { PublishSPKButton } from "@/components/publish-spk-button";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -15,6 +13,7 @@ import { Payment, STATUS_COLORS } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { SPKDetailActions } from "./actions";
 
 // Force dynamic rendering to prevent caching
 export const dynamic = "force-dynamic";
@@ -36,7 +35,9 @@ export default async function SPKDetailPage({
               Failed to load SPK details
             </p>
             <Link href="/dashboard">
-              <Button className="mt-4 w-full">Back to Dashboard</Button>
+              <button className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                Back to Dashboard
+              </button>
             </Link>
           </CardContent>
         </Card>
@@ -45,6 +46,19 @@ export default async function SPKDetailPage({
   }
 
   const spk = result.data;
+
+  // Get vendor token for sharing
+  let vendorToken: string | null = null;
+  if (spk.vendor_email) {
+    const tokenResult = await getOrCreateVendorToken(
+      spk.vendor_email,
+      spk.vendor_name,
+      spk.vendor_phone || undefined
+    );
+    if (tokenResult.success && tokenResult.token) {
+      vendorToken = tokenResult.token;
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -77,15 +91,14 @@ export default async function SPKDetailPage({
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4">
-              {spk.status === "draft" && (
-                <PublishSPKButton
-                  spkId={spk.id}
-                  vendorEmail={spk.vendor_email}
-                />
-              )}
-              <PDFPreviewButton spkId={spk.id} spkNumber={spk.spk_number} />
-            </div>
+            {/* Only show View SPK, Share SPK, Send to Email buttons */}
+            <SPKDetailActions
+              spkId={spk.id}
+              spkNumber={spk.spk_number}
+              vendorEmail={spk.vendor_email}
+              vendorToken={vendorToken}
+              currentStatus={spk.status}
+            />
           </CardContent>
         </Card>
 

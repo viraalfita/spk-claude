@@ -1,12 +1,48 @@
 "use server";
 
+import { getOrCreateVendorToken } from "@/app/actions/vendor";
 import { sendSPKCreatedEmail } from "@/lib/email";
 import { generateSPKPDFBuffer } from "@/lib/pdf/generate-buffer";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { CreateSPKFormData, SPKWithPayments } from "@/lib/types";
 import { generateSPKDatePrefix } from "@/lib/utils";
-import { getOrCreateVendorToken } from "@/app/actions/vendor";
 import { revalidatePath } from "next/cache";
+
+// Generate SPK number for preview (before creating SPK)
+export async function generateSPKNumber(): Promise<{
+  success: boolean;
+  spkNumber?: string;
+  error?: string;
+}> {
+  try {
+    const datePrefix = generateSPKDatePrefix();
+
+    // Query existing SPK numbers for today to determine next sequential number
+    const { data: existingNumbers } = await supabaseAdmin
+      .from("spk")
+      .select("spk_number")
+      .like("spk_number", `${datePrefix}/%`);
+
+    let nextIncrement = 1;
+    if (existingNumbers && existingNumbers.length > 0) {
+      const increments = existingNumbers
+        .map((row) => {
+          const parts = row.spk_number.split("/");
+          return parseInt(parts[parts.length - 1], 10);
+        })
+        .filter((n) => !isNaN(n));
+      if (increments.length > 0) {
+        nextIncrement = Math.max(...increments) + 1;
+      }
+    }
+
+    const spkNumber = `${datePrefix}/${nextIncrement.toString().padStart(3, "0")}`;
+    return { success: true, spkNumber };
+  } catch (error) {
+    console.error("Error generating SPK number:", error);
+    return { success: false, error: "Failed to generate SPK number" };
+  }
+}
 
 // Helper to get user session (placeholder - implement based on your auth strategy)
 async function getUserSession() {
@@ -66,6 +102,7 @@ export async function createSPK(data: CreateSPKFormData) {
         created_by: data.picName?.trim() || session.user.name,
         created_by_email: data.picEmail?.trim() || session.user.email,
         notes: data.notes || null,
+        signature_url: data.signatureUrl || null,
       })
       .select()
       .single();
@@ -139,12 +176,13 @@ export async function publishSPK(spkId: string, sendEmail: boolean = false) {
         const tokenResult = await getOrCreateVendorToken(
           spk.vendor_email,
           spk.vendor_name,
-          spk.vendor_phone
+          spk.vendor_phone,
         );
 
-        const vendorDashboardUrl = tokenResult.success && tokenResult.token
-          ? `${baseUrl}/vendor?token=${tokenResult.token}`
-          : undefined;
+        const vendorDashboardUrl =
+          tokenResult.success && tokenResult.token
+            ? `${baseUrl}/vendor?token=${tokenResult.token}`
+            : undefined;
 
         // Send email with PDF attachment and vendor dashboard link
         await sendSPKCreatedEmail({
@@ -257,5 +295,61 @@ export async function deleteSPK(spkId: string) {
   } catch (error) {
     console.error("Error deleting SPK:", error);
     return { success: false, error: "Failed to delete SPK" };
+  }
+}
+
+// Upload signature image to Supabase Storage
+export async function uploadSignature(
+  formData: FormData,
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const file = formData.get("signature") as File;
+    if (!file) {
+      return { success: false, error: "No file provided" };
+    }
+
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/png", "image/jpg"];
+    if (!allowedTypes.includes(file.type)) {
+      return { success: false, error: "Only JPG and PNG files are allowed" };
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      return { success: false, error: "File size must be less than 5MB" };
+    }
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 15);
+    const extension = file.name.split(".").pop();
+    const filename = `signatures/${timestamp}-${randomString}.${extension}`;
+
+    // Convert File to ArrayBuffer then to Buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabaseAdmin.storage
+      .from("spk-assets")
+      .upload(filename, buffer, {
+        contentType: file.type,
+        upsert: false,
+      });
+
+    if (error) {
+      console.error("Supabase storage error:", error);
+      return { success: false, error: "Failed to upload signature" };
+    }
+
+    // Get public URL
+    const { data: urlData } = supabaseAdmin.storage
+      .from("spk-assets")
+      .getPublicUrl(filename);
+
+    return { success: true, url: urlData.publicUrl };
+  } catch (error) {
+    console.error("Error uploading signature:", error);
+    return { success: false, error: "Failed to upload signature" };
   }
 }

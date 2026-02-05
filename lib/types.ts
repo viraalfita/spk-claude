@@ -19,6 +19,7 @@ export interface SPK {
   created_by_email: string; // Auto from session
   notes: string | null;
   pdf_url: string | null;
+  signature_url: string | null; // Signature image URL for QR code
 }
 
 export interface Payment {
@@ -73,6 +74,8 @@ export interface CreateSPKFormData {
   endDate?: string;
   paymentTerms: PaymentTerm[]; // Dynamic array of payment terms
   notes?: string;
+  termsAndConditions?: string; // Editable T&C for PDF (not persisted)
+  signatureUrl?: string; // Signature image URL for QR code (not persisted to SPK)
 }
 
 export interface UpdatePaymentFormData {
@@ -86,6 +89,13 @@ export interface UpdatePaymentFormData {
 // Combined types for display
 export interface SPKWithPayments extends SPK {
   payments: Payment[];
+}
+
+// Extended type for PDF generation with additional form data
+export interface SPKPDFData extends SPKWithPayments {
+  termsAndConditions?: string;
+  signatureUrl?: string;
+  signatureQRDataUrl?: string; // Base64 QR code image
 }
 
 // Currency options
@@ -109,3 +119,6 @@ export const STATUS_COLORS = {
   paid: "bg-blue-100 text-blue-800",
   overdue: "bg-red-100 text-red-800",
 } as const;
+
+// Default Terms & Conditions text
+export const DEFAULT_TERMS_AND_CONDITIONS = `This Work Order (SPK) is a binding agreement between the company and the vendor. The vendor agrees to complete the work as specified within the agreed timeline and budget. Payment will be released according to the payment terms outlined above upon completion of each milestone.`;

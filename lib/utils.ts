@@ -97,3 +97,51 @@ export function validatePaymentPercentages(
     total: Math.round(sum * 100) / 100, // Round to 2 decimal places
   };
 }
+
+// Format number with thousand separators for display
+export function formatNumberWithSeparators(
+  value: number | string,
+  currency: string = "IDR"
+): string {
+  const numValue = typeof value === "string" ? parseFloat(value) || 0 : value;
+
+  // Determine locale based on currency
+  const localeMap: Record<string, string> = {
+    IDR: "id-ID",
+    USD: "en-US",
+    SGD: "en-SG",
+    EUR: "de-DE",
+    MYR: "ms-MY",
+  };
+
+  const locale = localeMap[currency] || "en-US";
+  const IntlConstructor = typeof window !== "undefined" && window.Intl ? window.Intl : global.Intl;
+
+  return new IntlConstructor.NumberFormat(locale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(numValue);
+}
+
+// Parse formatted string back to number
+export function parseFormattedNumber(value: string): number {
+  // Remove all non-numeric characters except decimal point and minus
+  const cleanValue = value.replace(/[^\d.,-]/g, "")
+    .replace(/,/g, "") // Remove thousand separators
+    .replace(/\.(?=.*\.)/g, ""); // Keep only last decimal point
+
+  return parseFloat(cleanValue) || 0;
+}
+
+// Format percentage for display
+export function formatPercentageDisplay(value: number | string): string {
+  const numValue = typeof value === "string" ? parseFloat(value) || 0 : value;
+  return numValue.toString();
+}
+
+// Parse percentage input
+export function parsePercentageInput(value: string): number {
+  const cleanValue = value.replace(/[^\d.]/g, "");
+  const parsed = parseFloat(cleanValue) || 0;
+  return Math.min(100, Math.max(0, parsed)); // Clamp between 0-100
+}
