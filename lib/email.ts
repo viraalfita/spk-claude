@@ -1,17 +1,11 @@
-// Email utilities using MailerSend
-import { MailerSend, EmailParams, Sender, Recipient, Attachment } from "mailersend";
+// Email utilities using Resend
+import { Resend } from "resend";
 import { SPK } from "./types";
 
-const mailerSend = new MailerSend({
-  apiKey: process.env.MAILERSEND_API_KEY || "",
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Sender yang sudah diverifikasi via Sender Identity
-const getDefaultSender = () =>
-  new Sender(
-    process.env.MAILERSEND_FROM_EMAIL || "",
-    process.env.MAILERSEND_FROM_NAME || "SPK Creator"
-  );
+const getFromEmail = () => process.env.RESEND_FROM_EMAIL || "noreply@example.com";
+const getFromName = () => "SPK Creator";
 
 interface SendSPKEmailParams {
   to: string;
@@ -27,13 +21,20 @@ export async function sendSPKCreatedEmail({
   vendorDashboardUrl,
 }: SendSPKEmailParams) {
   try {
-    const recipients = [new Recipient(to)];
+    const attachments = pdfBuffer
+      ? [
+          {
+            filename: `SPK-${spk.spk_number.replace(/\//g, "-")}.pdf`,
+            content: pdfBuffer,
+          },
+        ]
+      : [];
 
-    const emailParams = new EmailParams()
-      .setFrom(getDefaultSender())
-      .setTo(recipients)
-      .setSubject(`SPK Published: ${spk.spk_number} - ${spk.project_name}`)
-      .setHtml(`
+    const { data, error } = await resend.emails.send({
+      from: `${getFromName()} <${getFromEmail()}>`,
+      to: [to],
+      subject: `SPK Published: ${spk.spk_number} - ${spk.project_name}`,
+      html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background-color: #2563eb; color: white; padding: 20px; text-align: center;">
             <h1 style="margin: 0; font-size: 24px;">SPK Published</h1>
@@ -104,8 +105,8 @@ export async function sendSPKCreatedEmail({
             <p style="margin: 10px 0 0 0;">SPK Creator System</p>
           </div>
         </div>
-      `)
-      .setText(
+      `,
+      text:
         `SPK Published: ${spk.spk_number}\n\n` +
         `Dear ${spk.vendor_name},\n\n` +
         `A new SPK has been created for your project.\n\n` +
@@ -117,21 +118,16 @@ export async function sendSPKCreatedEmail({
         (spk.end_date ? `- End Date: ${new Date(spk.end_date).toLocaleDateString()}\n` : "") +
         (vendorDashboardUrl ? `\nVendor Dashboard: ${vendorDashboardUrl}\n` : "") +
         `\nThe SPK document is attached to this email.\n\n` +
-        `Thank you for your partnership!`
-      );
+        `Thank you for your partnership!`,
+      attachments,
+    });
 
-    // Add PDF attachment if provided
-    if (pdfBuffer) {
-      const attachment = new Attachment(
-        pdfBuffer.toString("base64"),
-        `SPK-${spk.spk_number.replace(/\//g, "-")}.pdf`,
-        "attachment"
-      );
-      emailParams.setAttachments([attachment]);
+    if (error) {
+      console.error("Error sending email:", error);
+      return { success: false, error };
     }
 
-    const response = await mailerSend.email.send(emailParams);
-    return { success: true, data: response };
+    return { success: true, data };
   } catch (error) {
     console.error("Error sending email:", error);
     return { success: false, error };
@@ -156,15 +152,14 @@ export async function sendPaymentUpdateEmail({
   vendorDashboardUrl,
 }: SendPaymentUpdateEmailParams) {
   try {
-    const recipients = [new Recipient(to)];
     const statusColor = paymentStatus === "paid" ? "#22c55e" : paymentStatus === "overdue" ? "#ef4444" : "#f59e0b";
     const statusBgColor = paymentStatus === "paid" ? "#dcfce7" : paymentStatus === "overdue" ? "#fee2e2" : "#fef3c7";
 
-    const emailParams = new EmailParams()
-      .setFrom(getDefaultSender())
-      .setTo(recipients)
-      .setSubject(`Payment Update: ${spk.spk_number} - ${paymentTermName}`)
-      .setHtml(`
+    const { data, error } = await resend.emails.send({
+      from: `${getFromName()} <${getFromEmail()}>`,
+      to: [to],
+      subject: `Payment Update: ${spk.spk_number} - ${paymentTermName}`,
+      html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background-color: #2563eb; color: white; padding: 20px; text-align: center;">
             <h1 style="margin: 0; font-size: 24px;">Payment Status Updated</h1>
@@ -221,17 +216,21 @@ export async function sendPaymentUpdateEmail({
             <p style="margin: 10px 0 0 0;">SPK Creator System</p>
           </div>
         </div>
-      `)
-      .setText(
+      `,
+      text:
         `Payment Update: ${spk.spk_number}\n\n` +
         `Payment Term: ${paymentTermName}\n` +
         `Amount: ${spk.currency} ${paymentAmount.toLocaleString()}\n` +
         `Status: ${paymentStatus.toUpperCase()}\n` +
-        (vendorDashboardUrl ? `\nView details: ${vendorDashboardUrl}\n` : "")
-      );
+        (vendorDashboardUrl ? `\nView details: ${vendorDashboardUrl}\n` : ""),
+    });
 
-    const response = await mailerSend.email.send(emailParams);
-    return { success: true, data: response };
+    if (error) {
+      console.error("Error sending email:", error);
+      return { success: false, error };
+    }
+
+    return { success: true, data };
   } catch (error) {
     console.error("Error sending email:", error);
     return { success: false, error };
@@ -241,18 +240,21 @@ export async function sendPaymentUpdateEmail({
 // Helper untuk test email
 export async function sendTestEmail(to: string) {
   try {
-    const recipients = [new Recipient(to)];
+    const { data, error } = await resend.emails.send({
+      from: `${getFromName()} <${getFromEmail()}>`,
+      to: [to],
+      subject: "Test Email dari Resend",
+      html: "<h1>Halo!</h1><p>Ini adalah email test dari SPK Creator.</p>",
+      text: "Halo! Ini adalah email test dari SPK Creator.",
+    });
 
-    const emailParams = new EmailParams()
-      .setFrom(getDefaultSender())
-      .setTo(recipients)
-      .setSubject("Test Email dari MailerSend")
-      .setHtml("<h1>Halo!</h1><p>Ini adalah email test dari SPK Creator.</p>")
-      .setText("Halo! Ini adalah email test dari SPK Creator.");
+    if (error) {
+      console.error("Error sending test email:", error);
+      return { success: false, error };
+    }
 
-    const response = await mailerSend.email.send(emailParams);
-    console.log("Email terkirim:", response);
-    return { success: true, data: response };
+    console.log("Email terkirim:", data);
+    return { success: true, data };
   } catch (error) {
     console.error("Error sending test email:", error);
     return { success: false, error };
